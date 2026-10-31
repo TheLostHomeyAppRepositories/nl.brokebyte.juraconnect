@@ -1,6 +1,6 @@
 {
   "id": "nl.brokebyte.juraconnect",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "compatibility": ">=5.0.0",
   "platforms": [
     "local"
@@ -11,8 +11,8 @@
     "nl": "Jura Connect"
   },
   "description": {
-    "en": "Your Jura coffee machine, fully local — no cloud, no account.",
-    "nl": "Je Jura-koffiemachine, volledig lokaal — geen cloud, geen account."
+    "en": "Your Jura coffee machine, fully local: no cloud, no account.",
+    "nl": "Je Jura-koffiemachine, volledig lokaal: geen cloud, geen account."
   },
   "category": [
     "appliances"
@@ -125,7 +125,7 @@
       },
       "desc": {
         "en": "On when the drip tray or grounds container is full and needs emptying.",
-        "nl": "Actief wanneer de lekbak of het kaffeesatzbakje vol is en geleegd moet worden."
+        "nl": "Actief wanneer de lekbak of de koffiedikbak vol is en geleegd moet worden."
       },
       "getable": true,
       "setable": false,

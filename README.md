@@ -47,6 +47,11 @@ machine yet, so the four stay experimental. If you own one, please
 brew a coffee or an espresso and send the result with the model
 verification report. A report that it does not work helps just as much.
 
+On the E4 (EF1031), the "Brew a product" card also offers "2x Espresso"
+and "2x Coffee" from version 0.14.0. The machine data of that model
+marks them as inactive, so they were never offered before. They have
+not been confirmed on a real E4 yet; a report helps here too.
+
 ## Pairing
 
 1. Switch the machine on and close the J.O.E. app if it is connected.
@@ -77,8 +82,8 @@ While it connects, two things can come up:
 
 | Capability | What it shows |
 |---|---|
-| `onoff` | On/off state, read-only |
-| `alarm_generic` | Needs attention (a real fault; normal states such as heating up or switching off do not count) |
+| `onoff` | On/off state, read-only. It follows the machine being switched off and on, so Homey's own "Turned off", "Turned on" and "Is turned on" cards work |
+| `alarm_generic` | Needs attention (a real fault; normal states such as heating up, switching off or the machine's own settings menu do not count) |
 | `alarm_water` | Water tank empty |
 | `alarm_beans` | Out of beans |
 | `alarm_tray` | Drip tray or grounds container full |
@@ -96,6 +101,39 @@ plus an "is above X%" condition for each maintenance type. "Total
 brews" and the maintenance percentages are available in the device
 settings, under Statistics.
 
+Since 0.14.0 there are also:
+
+- "Machine became ready to brew" (trigger) and "Machine is / isn't
+  ready to brew" (condition). The machine counts as ready when it is
+  connected, a fresh status shows "coffee ready", no alarm and no busy
+  state (a drink, a rinse, heating up, switching off) is showing, and
+  that has been so for 4 seconds in a row. The trigger fires once each
+  time the machine becomes ready after it was seen not ready: after a
+  drink or a rinse, a solved alarm, or switching it on. It does not
+  fire when the app or Homey starts, and a model that does not report
+  "coffee ready" is never ready. The machine's own settings menu and
+  the display lock are not counted as an alarm or a busy state here.
+  A flow on this trigger that brews makes the machine busy and then
+  ready again, so the trigger fires again after that drink: "When
+  Machine became ready to brew, brew a coffee" keeps brewing one cup
+  after another. To brew a set number of cups, count them in a number
+  variable and brew only while it is above 0.
+- "Cleaning finished" and "Descaling finished" (triggers). They fire
+  once when the machine resets its cleaning or descaling percentage
+  after the programme, usually shortly after it ends. If Homey was not
+  connected then, they fire as soon as the app reads the machine
+  again. There is no such card for the filter.
+- None of these three triggers has tokens.
+- The `onoff` capability goes to off when the machine is switched
+  off, just before the tile becomes unavailable, and back to on as
+  soon as the machine answers again. A connection that is lost
+  without the machine announcing that it is switching off leaves it
+  as it is. That is what makes Homey's own "Turned off", "Turned on"
+  and "Is turned on" cards work. Switching the machine on or off from
+  Homey (the toggle on the tile, or Homey's own cards for switching on
+  and off) is still refused with a message: the dongle ignores that
+  command, see Known limitations.
+
 ### How it behaves
 
 - Alarms follow the status the machine sends by itself, so they show
@@ -103,15 +141,38 @@ settings, under Statistics.
 - Short events, such as taking out the drip tray to empty it, trigger
   your flows too. A flow that sends a notification fires each time
   one of these happens.
-- When you switch the machine off, the tile becomes unavailable at
-  once with "The machine is switched off.".
-- Switching off and heating up are normal states, not faults. They do
-  not turn on "Needs attention" or put a warning on the tile, on any
-  model. A real fault at the same time still does.
+- When you switch the machine off, `onoff` goes to off and then the
+  tile becomes unavailable at once with "The machine is switched
+  off.".
+- Switching off, heating up and the machine's own settings menu are
+  normal states, not faults. They do not turn on "Needs attention" or
+  put a warning on the tile, on any model. A real fault at the same
+  time still does.
 - A brew asked for while the machine is still busy with a drink or a
   rinse is not sent. The tile or flow card says so: "The machine is
   busy (a drink or a rinse is running), so this brew command was not
   sent. Try again when it is done."
+- Since 0.14.0 a brew is also not sent while the machine shows
+  something that needs attention (fill water, empty the drip tray or
+  grounds container, insert the tray), while it is not ready yet
+  ("please wait", or "heating up" on the six models whose machine
+  data marks it as an error) or while it is switching off. The button or
+  flow action says why, for example "The machine needs attention (fill
+  water), so this brew command was not sent. Fix it and try again.",
+  "The machine is not ready yet (please wait), so this brew command
+  was not sent. Try again in a moment." or "The machine is switching
+  off, so this brew command was not sent." An empty bean hopper does
+  not stop a brew. Turning off the setting "Do not brew while the
+  machine reports an alarm" (see Settings) switches these three checks
+  off.
+- Since 0.14.0 a brew is also refused as busy when the machine shows
+  a drink, a rinse or a programme (such as cleaning) whose start the
+  app did not see: after the app reconnected in the middle of it, or
+  during a very long programme. The text is then "The machine is busy
+  (a drink, a rinse or a programme is running), so this brew command
+  was not sent. Try again when it is done." It ends with the next
+  status from the machine, or two minutes after the last progress
+  message if none comes. The setting does not switch this one off.
 
 ## Settings
 
@@ -132,6 +193,14 @@ label above each field shows the numbers your specific machine has.
 you've dialled in on the machine itself (the app can't read that). A
 value your machine doesn't have is rejected when you save.
 
+Brewing has one checkbox, "Do not brew while the machine reports an
+alarm", on by default. It decides whether a brew command is sent while
+the machine shows something that needs attention, is not ready yet or
+is switching off, see How it behaves. Turn it off if a brew is refused
+while the machine itself can brew. It takes effect at the next tap,
+without a reconnect. The refusal for a machine that is busy with a
+drink, a rinse or a programme is not part of it.
+
 Machine IP address is filled in at pairing. Change it if your router
 gave the machine a new address. The same rule applies as for the
 manual IP field, see Known limitations.
@@ -150,9 +219,19 @@ manual IP field, see Known limitations.
 - The J.O.E. app can't connect while Homey is connected. The dongle
   only accepts one connection at a time.
 - If the app connects while the machine is already busy (for example
-  halfway through the rinse after switching on), it can't tell that a
-  drink or rinse is running, and a brew sent right then may be
-  reported as accepted while the machine ignores it.
+  halfway through the rinse after switching on), it only learns that
+  from the first progress message the machine sends, usually within a
+  second or two. A brew sent in that first moment may still be
+  reported as accepted while the machine ignores it. From the first
+  progress message on, the app refuses a brew as busy, also when it
+  missed the start of the drink or rinse (see How it behaves).
+- The checks for an alarm, "not ready yet" and switching off need a
+  recent status from the machine. Right after a connection was lost
+  or made, until the machine has sent its status, a brew is sent as
+  before and the machine itself decides.
+- "Cleaning finished" and "Descaling finished" have only been checked
+  against the logs of one machine (an E8). A programme that is broken
+  off, or another model, may behave differently; a report helps.
 - There's no way to remotely abort a brew already in progress.
 
 ## LAN security

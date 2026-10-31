@@ -2228,13 +2228,15 @@ class JuraMachineDevice extends Device {
 
   /**
    * Called once for every announced change from not ready to ready, after the
-   * state is true, and never for the first ready after the app started. For
-   * now it only writes the log line; `reason` (what the machine was not ready
-   * for) is for the log and goes nowhere else.
+   * state is true, and never for the first ready after the app started. It
+   * writes the log line and fires the flow trigger machine_became_ready, which
+   * has no tokens; `reason` (what the machine was not ready for) is for the log
+   * and goes nowhere else.
    * @param {string} reason
    */
   _onReadyToBrew(reason) {
     this.log(`Machine ready to brew (was not ready: ${reason}).`);
+    this.homey.flow.getDeviceTriggerCard('machine_became_ready').trigger(this).catch(this.error);
   }
 
   // ---------- flow actions (registered in app.js) ----------

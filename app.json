@@ -1251,6 +1251,24 @@
             "title": { "en": "Percent", "nl": "Percentage" }
           }
         ]
+      },
+      {
+        "id": "machine_became_ready",
+        "title": {
+          "en": "Machine became ready to brew",
+          "nl": "Machine werd klaar om te zetten"
+        },
+        "hint": {
+          "en": "Fires once when the machine has been ready for a few seconds, for example after a drink, a rinse, a solved alarm or switching it on. It does not fire when the app or Homey starts.",
+          "nl": "Gaat één keer af als de machine een paar seconden klaar is, bijvoorbeeld na een drankje, een spoeling, een opgelost alarm of het aanzetten. Niet bij het starten van de app of van Homey."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=jura-machine"
+          }
+        ]
       }
     ],
     "conditions": [
@@ -1399,6 +1417,24 @@
             "max": 100,
             "step": 1,
             "placeholder": { "en": "80", "nl": "80" }
+          }
+        ]
+      },
+      {
+        "id": "machine_is_ready",
+        "title": {
+          "en": "Machine !{{is|isn't}} ready to brew",
+          "nl": "Machine !{{is|is niet}} klaar om te zetten"
+        },
+        "hint": {
+          "en": "Checks whether the machine can brew a drink right now.",
+          "nl": "Controleert of de machine nu een drankje kan zetten."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=jura-machine"
           }
         ]
       }

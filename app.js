@@ -152,6 +152,13 @@ class JuraConnectApp extends App {
       'jura_maintenance_descale_crossed_above',
       'jura_maintenance_descale_above'
     );
+
+    // Ready state (see _updateReadiness in device.js). The trigger
+    // machine_became_ready is fired by the device itself and needs no
+    // listener; only the condition is answered here.
+    this.homey.flow
+      .getConditionCard('machine_is_ready')
+      .registerRunListener(async ({ device }) => device.isReadyToBrew());
   }
 
 }

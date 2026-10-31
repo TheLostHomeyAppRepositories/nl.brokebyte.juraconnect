@@ -1422,7 +1422,11 @@ class JuraMachineDevice extends Device {
           const now = this._monotonicNow();
           if (this._busySince === null) this._busySince = now;
           const busyTooLong = now - this._busySince > this._timing.BUSY_MAX_MS;
+          const endsSwitchedOff = this._switchedOff;
           this._endFailRun();
+          // The machine answers, so it is on, and no status comes with it to
+          // say so: onoff goes back to true here (see _endSwitchedOff).
+          if (endsSwitchedOff) this._setCapIfChanged('onoff', true);
           this._pollFailCount = 0;
           this._lastAliveAt = now;
           this._healthPolls.busy += 1;
@@ -1632,23 +1636,13 @@ class JuraMachineDevice extends Device {
     }
 
     const setIfChanged = (cap, value) => {
-      let differs;
-      try {
-        differs = this._retryCaps.has(cap) || this.getCapabilityValue(cap) !== value;
-      } catch (err) {
-        this.error('Status capability could not be read:', cap, safeText(err.message, LOG_TEXT_MAX));
-        return;
-      }
-      if (!differs) return;
-      this._retryCaps.delete(cap);
-      this.setCapabilityValue(cap, value).catch((err) => {
-        this._retryCaps.add(cap);
-        this.error(err);
-      });
+      this._setCapIfChanged(cap, value);
     };
 
     // onoff reflects "not in standby" -- the closest read-only analogue
-    // of power state this protocol exposes.
+    // of power state this protocol exposes. It is false as well while the
+    // machine is switched off (see _logSwitchedOff), and the first status
+    // after that makes it true again here.
     setIfChanged('onoff', !status.activeAlerts.includes('goodbye'));
 
     const errors = status.errors.filter((name) => !NOT_A_FAULT_ALERTS.has(name));
@@ -1689,6 +1683,33 @@ class JuraMachineDevice extends Device {
         this.unsetWarning().catch(failed);
       }
     }
+  }
+
+  /**
+   * Set a capability when its value differs from the one it has, or when its
+   * last set failed (see `_retryCaps` in _applyStatus). The call is made
+   * before this returns. Returns what the call returned, a promise that never
+   * rejects (a failed call is logged and marked for another try), or nothing
+   * when no call was made. A capability that cannot be read is logged and left
+   * alone.
+   * @param {string} cap
+   * @param {boolean|number|string|null} value
+   * @returns {Promise<void>|undefined}
+   */
+  _setCapIfChanged(cap, value) {
+    let differs;
+    try {
+      differs = this._retryCaps.has(cap) || this.getCapabilityValue(cap) !== value;
+    } catch (err) {
+      this.error('Status capability could not be read:', cap, safeText(err.message, LOG_TEXT_MAX));
+      return undefined;
+    }
+    if (!differs) return undefined;
+    this._retryCaps.delete(cap);
+    return this.setCapabilityValue(cap, value).catch((err) => {
+      this._retryCaps.add(cap);
+      this.error(err);
+    });
   }
 
   /**
@@ -1879,7 +1900,8 @@ class JuraMachineDevice extends Device {
    * switched off. The frame lines kept while the log was quiet (see _logFrame)
    * are written before the line that says why: they are those of this attempt,
    * the one that showed the machine is on (see _flushQuietFrames). The tile is
-   * left to the caller (see _poll).
+   * left to the caller (see _poll). onoff goes back to true here, as it would
+   * with the first status: the machine is on, whatever the connection does.
    */
   _endSwitchedOff() {
     this._switchedOff = false;
@@ -1888,6 +1910,7 @@ class JuraMachineDevice extends Device {
     this._quietNextSummaryAt = null;
     this._failRunSince = null;
     this._pollFailCount = 0;
+    this._setCapIfChanged('onoff', true);
     this._flushQuietFrames();
     this.log('Machine answers again but the connection failed: no longer treated as switched off.');
   }
@@ -1906,12 +1929,14 @@ class JuraMachineDevice extends Device {
    * every TIMING.QUIET_SUMMARY_MS. The backoff of the connects is as it is (see
    * _doConnect). The tile goes unavailable at once, with its own text: an
    * announcement followed by a machine that does not answer leaves no doubt, so
-   * it need not wait for TIMING.UNAVAILABLE_AFTER_MS. A call that was refused,
-   * or that was not made because another was still on its way, is made again at
-   * the next poll that fails (see _setTile). The tile becomes available again,
-   * and the run ends, at the first poll that works (see _pollSucceeded), or
-   * ends without that when a failure with a TCP session shows that the machine
-   * is on (see _endSwitchedOff).
+   * it need not wait for TIMING.UNAVAILABLE_AFTER_MS. onoff goes to false just
+   * before that (see _setTile), so that Homey's "Turned off" has a device that
+   * is still available. The tile call, when it was refused or not made because
+   * another was still on its way, is made again at the next poll that fails
+   * (see _setTile). The tile becomes available again, and the run ends, at the
+   * first poll that works (see _pollSucceeded), or ends without that when a
+   * failure with a TCP session shows that the machine is on (see
+   * _endSwitchedOff).
    * @param {Error} err
    */
   _logSwitchedOff(err) {
@@ -1920,7 +1945,7 @@ class JuraMachineDevice extends Device {
     if (this._failRunSince === null) this._failRunSince = now;
     this._lastFailClass = pollFailClass(err);
     this._lastFailText = SWITCHED_OFF_TEXT;
-    if (this._available !== false) this._setTile(false, SWITCHED_OFF_TEXT);
+    if (this._available !== false) this._setTile(false, SWITCHED_OFF_TEXT, true);
     if (this._switchedOff) {
       this._logQuietSummary(now);
       return;
@@ -1999,14 +2024,28 @@ class JuraMachineDevice extends Device {
    * @param {string} [text] for an unavailable tile what it says; for an
    *   available one why it is available again, in that line (when left out:
    *   that a status was read)
+   * @param {boolean} [switchedOff] the tile goes unavailable because the
+   *   machine is switched off (see _logSwitchedOff): onoff is set to false
+   *   first and the call waits for it, as Homey may not fire "Turned off" for a
+   *   device that is unavailable. A failed set does not hold the tile back, and
+   *   it is marked for another try (see _setCapIfChanged), but that try is
+   *   made in two places only: here, when the tile call is made again (it was
+   *   refused too, or not made because another was on its way), and as the
+   *   `true` that the machine being on again writes, which goes through
+   *   whatever value Homey holds. Once the tile is unavailable false is not
+   *   tried again, on purpose: it would be set on an unavailable device, which
+   *   is what the order above is there to avoid. onoff then stays true, and
+   *   "Turned off" does not fire, for as long as the machine stays off (as far
+   *   as Homey stores nothing for a refused call).
    */
-  async _setTile(available, text) {
+  async _setTile(available, text, switchedOff = false) {
     if (this._tileCallPending) return;
     this._tileCallPending = true;
     try {
       if (available) {
         await this.setAvailable();
       } else {
+        if (switchedOff) await this._setCapIfChanged('onoff', false);
         await this.setUnavailable(text);
       }
       const wasAvailable = this._available;

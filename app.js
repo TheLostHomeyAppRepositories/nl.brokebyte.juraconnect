@@ -3,6 +3,7 @@
 const { App } = require('homey');
 const models = require('./lib/models');
 const profileLib = require('./lib/profile');
+const brewChoices = require('./lib/brewChoices');
 
 class JuraConnectApp extends App {
 
@@ -56,12 +57,13 @@ class JuraConnectApp extends App {
 
     // The brewable set differs per profile (EF533 vs EF533V2 vs ...),
     // so the picker is filled from the device's own profile rather
-    // than a fixed list -- see lib/profiles/*.js for what each has.
+    // than a fixed list -- see lib/profiles/*.js for what each has. The
+    // active products, plus the few inactive ones lib/brewChoices.js names.
     brewAction.registerArgumentAutocompleteListener('product', async (query, args) => {
       const profile = getDeviceProfile(args.device);
       const q = query.trim().toLowerCase();
-      return profile.products
-        .filter((p) => p.active !== false)
+      return brewChoices
+        .offeredProducts(profile)
         .filter(buildsWithoutOverrides)
         .filter((p) => !q || p.rawName.toLowerCase().includes(q) || p.name.includes(q))
         .map((p) => ({ id: p.name, name: p.rawName }));

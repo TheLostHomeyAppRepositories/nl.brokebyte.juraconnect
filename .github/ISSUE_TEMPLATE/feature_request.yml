@@ -8,7 +8,7 @@ body:
     id: problem
     attributes:
       label: What are you trying to do?
-      description: The underlying need, not necessarily the solution — helps figure out the best way to support it.
+      description: The underlying need, not necessarily the solution. It helps figure out the best way to support it.
     validations:
       required: true
 

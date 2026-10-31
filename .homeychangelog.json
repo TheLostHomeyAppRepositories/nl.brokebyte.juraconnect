@@ -46,13 +46,13 @@
     "en": "Fixed app icon rendering blank on the Store listing; fixed pairing prompt assuming an OK button that not every model has; documented the multi-minute alarm-update delay as a machine/dongle quirk, not a bug; new driver image and app banner (real photos, per App Store guidelines); shortened app description."
   },
   "0.3.2": {
-    "en": "Fixed both app icon and driver flow-card icons rendering invisible/blank on the live listing — Homey masks icons by CSS luminance, not simple rasterization, so the fill needed to be white; the driver icon file also didn't exist at all until now."
+    "en": "Fixed both app icon and driver flow-card icons rendering invisible/blank on the live listing. Homey masks icons by CSS luminance, not simple rasterization, so the fill needed to be white; the driver icon file also didn't exist at all until now."
   },
   "0.4.0": {
     "en": "Added alarm_outlet_missing and alarm_rear_cover_missing capabilities with flow triggers/conditions, covering ~96-97% of bundled profiles on the same survey-then-add pattern as the existing tray/water/beans alarms."
   },
   "0.4.1": {
-    "en": "Fixed all capability icons rendering as empty/missing placeholders — a stray double-hyphen inside the SVG comments broke the XML parsing. Also added icons for the three maintenance-percent capabilities and gave the beans icon a proper crease."
+    "en": "Fixed all capability icons rendering as empty/missing placeholders. A stray double-hyphen inside the SVG comments broke the XML parsing. Also added icons for the three maintenance-percent capabilities and gave the beans icon a proper crease."
   },
   "0.5.0": {
     "en": "Fixed brew() sometimes reporting a genuinely successful brew as failed right after the machine woke from energy-safe mode. Added quick-access Coffee/Espresso buttons on the device tile, with optional ml overrides in device settings.",

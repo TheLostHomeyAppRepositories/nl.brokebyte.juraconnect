@@ -41,9 +41,9 @@ body:
     attributes:
       label: Did pairing complete?
       options:
-        - "Yes — auto-detected the right model"
-        - "Yes — but I had to pick the model manually"
-        - "No — pairing failed"
+        - "Yes, auto-detected the right model"
+        - "Yes, but I had to pick the model manually"
+        - "No, pairing failed"
     validations:
       required: true
 
@@ -54,7 +54,7 @@ body:
       description: Needs water, needs beans, tray full, tray missing and on/off showing up correctly on the device tile
       options:
         - "Yes, looks correct"
-        - "Partially — some states are wrong or missing"
+        - "Partially, some states are wrong or missing"
         - "No"
         - "Didn't test"
     validations:
@@ -67,7 +67,7 @@ body:
       description: Using the "brew_product" flow action
       options:
         - "Yes"
-        - "Partially — some products fail or brew the wrong thing"
+        - "Partially, some products fail or brew the wrong thing"
         - "No"
         - "Didn't test"
     validations:
@@ -89,7 +89,7 @@ body:
     id: notes
     attributes:
       label: Anything that looked wrong?
-      description: Wrong alert names, wrong maintenance direction, brewing the wrong product, missing capabilities, etc. — as much detail as you can give.
+      description: Wrong alert names, wrong maintenance direction, brewing the wrong product, missing capabilities, etc. Give as much detail as you can.
 
   - type: textarea
     id: logs

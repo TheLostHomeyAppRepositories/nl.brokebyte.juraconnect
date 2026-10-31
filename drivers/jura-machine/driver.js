@@ -112,7 +112,7 @@ class JuraMachineDriver extends Driver {
       const profileCode =
         manualProfileCode || (machine.detectedModel && machine.detectedModel.profileCode);
       if (!profileCode) {
-        throw new Error('No machine profile selected — please pick one from the list');
+        throw new Error('No machine profile selected. Please pick one from the list');
       }
       const profile = models.getProfile(profileCode);
       const connId = JuraClient.randomConnId();
@@ -144,7 +144,7 @@ class JuraMachineDriver extends Driver {
               `Machine accepted pairing but sent an unusable token (length ${result.hashLength}). Please report this.`
             );
           }
-          throw new Error('Machine accepted pairing but returned no auth hash — please retry.');
+          throw new Error('Machine accepted pairing but returned no auth hash. Please retry.');
         }
         return {
           address: machine.address,

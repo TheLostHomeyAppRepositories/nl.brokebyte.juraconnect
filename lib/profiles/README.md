@@ -1,7 +1,7 @@
 # Adding support for another Jura model
 
 This app's protocol layer (`crypto.js`, `protocol.js`, `discovery.js`,
-`juraClient.js`, the recipe encoder in `profile.js`) is model-agnostic —
+`juraClient.js`, the recipe encoder in `profile.js`) is model-agnostic:
 it works against whatever profile object it's handed. The only
 model-specific pieces are the bundled profile data files in this
 folder, and their registration in `../models.js`.
@@ -9,15 +9,15 @@ folder, and their registration in `../models.js`.
 ## Currently bundled
 
 All 72 EF codes from `jura_connect`'s `JOE_MACHINES.TXT` are bundled
-here, one file per code — see `../models.js`'s `MODELS` array for the
+here, one file per code. See `../models.js`'s `MODELS` array for the
 full list (label, EF code, every known article number). Two are
 live-verified against real hardware so far, both with the `verified:
 true` flag set in `models.js`:
 
 | EF code | Model | Verified via |
 |---|---|---|
-| `EF538` | Jura E8 | our own machine — pairing, status, brewing, maintenance %, alarms |
-| `EF1013` | ENA 4 (EA/EB/etc. — same EF code across regional variants) | an external tester's [GitHub issue #1](https://github.com/WoutvanderAa/homey-jura-connect/issues/1) — pairing, brewing, all five alarms at the time |
+| `EF538` | Jura E8 | our own machine: pairing, status, brewing, maintenance %, alarms |
+| `EF1013` | ENA 4 (EA/EB/etc., same EF code across regional variants) | an external tester's [GitHub issue #1](https://github.com/WoutvanderAa/homey-jura-connect/issues/1): pairing, brewing, all five alarms at the time |
 
 Every other bundled profile is untested against real hardware and
 labelled accordingly in the pairing/settings UI.
@@ -26,12 +26,12 @@ labelled accordingly in the pairing/settings UI.
 
 1. **Find the EF code(s)** for the model. Install the `jura_connect`
    PyPI package locally (`pip install jura_connect`) and check its
-   bundled `data/JOE_MACHINES.TXT` — it maps every article number
+   bundled `data/JOE_MACHINES.TXT`. It maps every article number
    Jura has shipped to a model name and EF code, e.g.:
    ```
    15480;S8 (EB);EF1091;13
    ```
-   The same file also lists every article number for that EF code —
+   The same file also lists every article number for that EF code:
    collect all of them for step 3.
 
 2. **Extract the profile** with the same script used to generate every
@@ -72,7 +72,7 @@ labelled accordingly in the pairing/settings UI.
    when auto-detection doesn't recognise a machine's article number.
 
 Nothing in `driver.js`, `device.js`, or `juraClient.js` needs to
-change — they all already read models generically through
+change: they all already read models generically through
 `lib/models.js`.
 
 ## Verification checklist (do this before trusting a new profile)
@@ -86,7 +86,7 @@ hardware:
 - [ ] Pairing handshake completes and returns an auth hash
 - [ ] `@HU?` status reads back a plausible `@TF:` frame (not an error)
 - [ ] The alert names shown for known machine states (e.g. "no beans",
-      "heating up") actually match what the machine is doing — this is
+      "heating up") actually match what the machine is doing. This is
       where a wrong EF code would show up first, since alert bit
       *positions* differ between machines
 - [ ] A cheap/low-risk product (e.g. hot water) brews correctly before

@@ -37,6 +37,16 @@ const MAINTENANCE_TRIGGER_IDS = {
   jura_maintenance_descale: 'jura_maintenance_descale_crossed_above',
 };
 
+// The "finished" trigger cards: the machine resets its own cleaning or
+// descaling percentage after the programme, so a reading lower than the
+// stored one means the programme has finished. No filter card: that was
+// never observed. Fired by the same maintenance-read block, device-only
+// (no run listener in app.js, like machine_became_ready).
+const MAINTENANCE_FINISHED_IDS = Object.freeze({
+  jura_maintenance_cleaning: 'jura_maintenance_cleaning_finished',
+  jura_maintenance_descale: 'jura_maintenance_descale_finished',
+});
+
 // What a read-only label in the settings page's Statistics group shows when
 // there is nothing to show (no reading yet, or the machine doesn't track
 // that maintenance type) -- same as the labels' own "value" in app.json.
@@ -416,7 +426,8 @@ class JuraMachineDevice extends Device {
     this._pollTimer = null;
     this._pollCount = 0;
     // Whether the maintenance reads are owed (see _poll): set on every
-    // MAINTENANCE_POLL_EVERY-th poll, cleared when they are made.
+    // MAINTENANCE_POLL_EVERY-th poll and at a busy reset (a programme is
+    // running), cleared when they are made.
     this._maintenanceDue = false;
     this._pollFailCount = 0;
     this._polling = false;
@@ -1445,6 +1456,8 @@ class JuraMachineDevice extends Device {
           }
           if (busyTooLong) {
             this._busySince = null;
+            // A programme is running (only one reaches the busy limit): read the percentages on the first status after it.
+            this._maintenanceDue = true;
             const busyText = `Machine answered busy for more than ${this._timing.BUSY_MAX_MS / 1000} s without sending a status`;
             this.log(`${busyText}; the connection is reset once, and the busy time starts over.`);
             await this._resetClient(busyText, client);
@@ -1469,7 +1482,8 @@ class JuraMachineDevice extends Device {
       // phase of the client, or a brew() of this device that is running): a
       // brew queued behind one would wait for it. The reading stays due
       // and is made by the first poll after the brew; the count, and so the
-      // beat of 1, 31, 61, ..., does not move.
+      // beat of 1, 31, 61, ..., does not move. A busy reset makes the reading
+      // due as well, so it comes with the first status after a programme.
       if (this._pollCount % MAINTENANCE_POLL_EVERY === 1) this._maintenanceDue = true;
       if (this._maintenanceDue && !client.inBrewPhase() && this._brewsRunning === 0) {
         this._maintenanceDue = false;
@@ -1516,6 +1530,14 @@ class JuraMachineDevice extends Device {
                 .getDeviceTriggerCard(MAINTENANCE_TRIGGER_IDS[cap])
                 .trigger(this, { value }, { value, previousValue })
                 .catch(this.error);
+              // The machine resets the percentage after a cleaning or
+              // descaling programme: a lower reading than the stored one
+              // means it has finished (also when Homey was not connected
+              // at its end). The filter has no finished card.
+              if (value < previousValue && MAINTENANCE_FINISHED_IDS[cap]) {
+                this.log(`Maintenance finished (${cap}): ${previousValue}% -> ${value}%`);
+                this.homey.flow.getDeviceTriggerCard(MAINTENANCE_FINISHED_IDS[cap]).trigger(this).catch(this.error);
+              }
             }
           };
           setIfTracked('jura_maintenance_cleaning', maint.cleaning);

@@ -1253,6 +1253,42 @@
         ]
       },
       {
+        "id": "jura_maintenance_cleaning_finished",
+        "title": {
+          "en": "Cleaning finished",
+          "nl": "Reinigen klaar"
+        },
+        "hint": {
+          "en": "Fires once when the machine resets its cleaning percentage after the programme, usually shortly after it ends. If Homey was not connected then, it fires as soon as the app reads the machine again.",
+          "nl": "Gaat één keer af als de machine na het programma het reinigingspercentage terugzet, meestal kort na het einde. Was Homey toen niet verbonden, dan gaat hij af zodra de app de machine weer uitleest."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=jura-machine"
+          }
+        ]
+      },
+      {
+        "id": "jura_maintenance_descale_finished",
+        "title": {
+          "en": "Descaling finished",
+          "nl": "Ontkalken klaar"
+        },
+        "hint": {
+          "en": "Fires once when the machine resets its descaling percentage after the programme, usually shortly after it ends. If Homey was not connected then, it fires as soon as the app reads the machine again.",
+          "nl": "Gaat één keer af als de machine na het programma het ontkalkpercentage terugzet, meestal kort na het einde. Was Homey toen niet verbonden, dan gaat hij af zodra de app de machine weer uitleest."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=jura-machine"
+          }
+        ]
+      },
+      {
         "id": "machine_became_ready",
         "title": {
           "en": "Machine became ready to brew",

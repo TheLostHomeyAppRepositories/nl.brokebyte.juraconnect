@@ -72,10 +72,11 @@ const SWITCH_OFF_ALERT = 'switch_off_delay_active';
 // a profile gives them: they count for neither the generic alarm nor the
 // warning (see _applyStatus). The machine switching off is one (the alert is
 // `error` in all 72 profiles, and please_wait comes just before the
-// announcement); heating up after a switch-on is the other (`error` in
-// EF532V2, EF1012, EF1070, EF537, EF566 and EF566UL). All of them stay in the
-// `Status:` line.
-const NOT_A_FAULT_ALERTS = new Set([SWITCH_OFF_ALERT, 'please_wait', 'heating_up']);
+// announcement); heating up after a switch-on is another (`error` in
+// EF532V2, EF1012, EF1070, EF537, EF566 and EF566UL); the machine's own
+// settings menu, program_mode_status, is a third (`error` in 71 of the 72
+// profiles; Wout, 2026-10-31). All of them stay in the `Status:` line.
+const NOT_A_FAULT_ALERTS = new Set([SWITCH_OFF_ALERT, 'please_wait', 'heating_up', 'program_mode_status']);
 
 // What the tile says from the moment the machine is lost after it announced
 // that it is switching off (see _poll).
@@ -1560,11 +1561,11 @@ class JuraMachineDevice extends Device {
    * the last text (see _resetClient), so a connection that is made again
    * applies the status once more, and the log says so once.
    *
-   * Normal machine states are no fault: switch_off_delay_active, please_wait
-   * and heating_up (NOT_A_FAULT_ALERTS) count for neither `alarm_generic` nor the
-   * warning, whatever their severity in the profile. They stay in the `Status:`
-   * line. A real fault at the same time still sets both, with only the real
-   * faults in the text of the warning.
+   * Normal machine states are no fault: switch_off_delay_active, please_wait,
+   * heating_up and program_mode_status, the machine's own menu (NOT_A_FAULT_ALERTS),
+   * count for neither `alarm_generic` nor the warning, whatever their severity
+   * in the profile. They stay in the `Status:` line. A real fault at the same
+   * time still sets both, with only the real faults in the text of the warning.
    * @param {{rawHex: string, activeAlerts: string[], errors: string[]}} status
    * @param {{fromPoll?: boolean}} [opts]
    */

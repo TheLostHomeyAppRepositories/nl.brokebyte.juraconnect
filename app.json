@@ -913,6 +913,28 @@
         {
           "type": "group",
           "label": {
+            "en": "Brewing",
+            "nl": "Zetten"
+          },
+          "children": [
+            {
+              "id": "brew_alarm_guard",
+              "type": "checkbox",
+              "label": {
+                "en": "Do not brew while the machine reports an alarm",
+                "nl": "Niet zetten zolang de machine een alarm geeft"
+              },
+              "hint": {
+                "en": "When the machine asks for something (fill water, empty the drip tray or grounds container, insert the tray), is not ready yet or is switching off, the brew command is not sent and the button or flow action says why. An empty bean hopper does not stop a brew. Turn this off if a brew is refused while the machine itself can brew.",
+                "nl": "Vraagt de machine om iets (water bijvullen, lekbak of koffiedikbak legen, lekbak plaatsen), is hij nog niet klaar of schakelt hij uit, dan wordt de zetopdracht niet verstuurd en zegt de knop of flow-actie waarom. Een leeg bonenreservoir houdt het zetten niet tegen. Zet dit uit als een zetopdracht geweigerd wordt terwijl de machine zelf wel kan zetten."
+              },
+              "value": true
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "label": {
             "en": "Statistics",
             "nl": "Statistieken"
           },

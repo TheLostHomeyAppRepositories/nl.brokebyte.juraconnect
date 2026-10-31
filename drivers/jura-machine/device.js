@@ -109,6 +109,18 @@ const READY_FRESH_MS = 10000;
 // the machine showed.
 const READY_UNKNOWN_OBSTACLES = new Set(['not connected', 'no status', 'stale status', 'tile unavailable', 'brew running']);
 
+// How long after its newest @TB or @TV: (with no @TS or @TF: since) the device
+// still takes a drink, a rinse or a programme to be running when its client
+// does not know the phase (see _assertBrewAllowed). It covers the gap of a
+// reset (at most 23.8 s measured) plus one failed reconnect (20 s and a 40 s
+// backoff). Not in TIMING: a test moves the clock instead.
+const MISSED_PHASE_HOLD_MS = 120000;
+
+// What the user is told for that refusal. It says "machine is busy" on
+// purpose, like the client's own BREW_BUSY text.
+const MISSED_PHASE_BUSY_TEXT =
+  'The machine is busy (a drink, a rinse or a programme is running), so this brew command was not sent. Try again when it is done.';
+
 // Everything about when this device connects again and when its tile goes
 // unavailable. One frozen object: a test scales a copy on the instance
 // (`device._timing = { ...TIMING, RECONNECT_GAP_MS: 200 }`) and never touches
@@ -2319,54 +2331,72 @@ class JuraMachineDevice extends Device {
    * when the machine has shown a reason not to brew (see brewBlockers in
    * lib/readiness.js): it needs attention (fill water, empty the grounds), it
    * is not ready yet (please_wait, heating_up) or it is switching off. The
-   * brew_alarm_guard setting off (a missing value counts as on) disables the
-   * whole guard: alarm, not ready and switching off.
+   * brew_alarm_guard setting off (a missing value counts as on) disables those
+   * three, and only those: the busy refusal below does not depend on it.
    *
-   * The guard stays out of the client's own brew phase: a brew asked for then
-   * goes on to the client, which refuses it as busy if the phase still runs
-   * when the brew is written (opts.refuseInBrewPhase). Outside a brew phase an
-   * alarm, "not ready" and a switch_off_delay_active count only in a fresh
-   * status, with the same freshness as the ready state (see _readinessInput).
-   * Switching off also counts from the announcement while the window of
-   * TIMING.SWITCH_OFF_WINDOW_MS is open, also when the status is no longer
-   * fresh (the announcement is on the air for only one frame), unless a fresh
-   * status shows coffee_ready. That exception holds only while the status is
-   * fresh, so within the window the refusal can come back. The first reason
-   * wins, in the order switching off, attention, not ready. A refusal logs one
-   * line and throws the text for the user. It only reads state: no timer,
-   * nothing written, and a refused brew is never counted as running.
+   * Busy refusal, first of all and whatever the setting: when the device saw
+   * progress (a @TB or a @TV:) and no @TS or @TF: after it, less than
+   * MISSED_PHASE_HOLD_MS ago (this._lastProgressAt), a drink, a rinse or a
+   * programme is taken to be running, and the brew is refused as busy. That
+   * wins over every other reason. It only applies when the client does not
+   * know the phase (no client, or a client outside its brew phase, for example
+   * a new one after a reset, or one past the cap of its phase): when the
+   * client's own brew phase runs, the guard stays out of it and the brew goes
+   * on to the client, which refuses it as busy if the phase still runs when
+   * the brew is written (opts.refuseInBrewPhase).
+   *
+   * Outside a brew phase an alarm, "not ready" and a switch_off_delay_active
+   * count only in a fresh status, with the same freshness as the ready state
+   * (see _readinessInput). Switching off also counts from the announcement
+   * while the window of TIMING.SWITCH_OFF_WINDOW_MS is open, also when the
+   * status is no longer fresh (the announcement is on the air for only one
+   * frame), unless a fresh status shows coffee_ready. That exception holds
+   * only while the status is fresh, so within the window the refusal can come
+   * back. The first reason wins, in the order switching off, attention, not
+   * ready. A refusal logs one line and throws the text for the user. It only
+   * reads state: no timer, nothing written, and a refused brew is never
+   * counted as running.
    *
    * A guard that fails itself never stops a brew: that logs one error line and
-   * the brew goes ahead, as it did before the guard existed.
+   * the brew goes ahead, as it did before the guard existed. That holds for
+   * the busy refusal as well.
    * @param {string} productName
    */
   _assertBrewAllowed(productName) {
     let refusal = null;
     try {
-      if (this.getSettings().brew_alarm_guard === false) return;
       const now = this._monotonicNow();
-      const input = this._readinessInput();
-      const fresh = input.statusIsFresh && !input.inBrewPhase && input.status !== null;
-      const blockers = fresh ? brewBlockers(input.status) : { attention: [], notReady: [], switchingOff: false };
-      const switchingOff =
-        blockers.switchingOff ||
-        (!input.inBrewPhase && this._switchOffWindowOpen(now) && !(fresh && input.status.activeAlerts.includes(READY_ALERT)));
-      // Names as the machine's profile has them (fill_water) for the log, as
-      // words (fill water) for the user.
-      const asWords = (names) => names.map((name) => name.replace(/_/g, ' ')).join(', ');
-      let reason = null;
-      let text = null;
-      if (switchingOff) {
-        reason = 'switching off';
-        text = 'The machine is switching off, so this brew command was not sent.';
-      } else if (blockers.attention.length > 0) {
-        reason = `needs attention (${blockers.attention.join(', ')})`;
-        text = `The machine needs attention (${asWords(blockers.attention)}), so this brew command was not sent. Fix it and try again.`;
-      } else if (blockers.notReady.length > 0) {
-        reason = `not ready (${blockers.notReady.join(', ')})`;
-        text = `The machine is not ready yet (${asWords(blockers.notReady)}), so this brew command was not sent. Try again in a moment.`;
+      const client = this._client;
+      const clientKnowsPhase = client !== null && client.inBrewPhase();
+      if (!clientKnowsPhase && this._lastProgressAt !== null && now - this._lastProgressAt < MISSED_PHASE_HOLD_MS) {
+        refusal = {
+          line: `Brew not sent (${safeText(productName)}): busy (progress without a status, last progress frame ${formatDuration(now - this._lastProgressAt)} ago).`,
+          text: MISSED_PHASE_BUSY_TEXT,
+        };
+      } else if (this.getSettings().brew_alarm_guard !== false) {
+        const input = this._readinessInput();
+        const fresh = input.statusIsFresh && !input.inBrewPhase && input.status !== null;
+        const blockers = fresh ? brewBlockers(input.status) : { attention: [], notReady: [], switchingOff: false };
+        const switchingOff =
+          blockers.switchingOff ||
+          (!input.inBrewPhase && this._switchOffWindowOpen(now) && !(fresh && input.status.activeAlerts.includes(READY_ALERT)));
+        // Names as the machine's profile has them (fill_water) for the log, as
+        // words (fill water) for the user.
+        const asWords = (names) => names.map((name) => name.replace(/_/g, ' ')).join(', ');
+        let reason = null;
+        let text = null;
+        if (switchingOff) {
+          reason = 'switching off';
+          text = 'The machine is switching off, so this brew command was not sent.';
+        } else if (blockers.attention.length > 0) {
+          reason = `needs attention (${blockers.attention.join(', ')})`;
+          text = `The machine needs attention (${asWords(blockers.attention)}), so this brew command was not sent. Fix it and try again.`;
+        } else if (blockers.notReady.length > 0) {
+          reason = `not ready (${blockers.notReady.join(', ')})`;
+          text = `The machine is not ready yet (${asWords(blockers.notReady)}), so this brew command was not sent. Try again in a moment.`;
+        }
+        if (reason !== null) refusal = { line: `Brew not sent (${safeText(productName)}): ${reason}.`, text };
       }
-      if (reason !== null) refusal = { line: `Brew not sent (${safeText(productName)}): ${reason}.`, text };
     } catch (err) {
       this.error('Brew guard could not be evaluated, the brew goes ahead:', safeText(err && err.message, LOG_TEXT_MAX));
       return;
@@ -2411,7 +2441,9 @@ class JuraMachineDevice extends Device {
    * with a drink or a rinse (opts.refuseInBrewPhase, see JuraClient.inBrewPhase)
    * is not sent either, and the user is told the machine is busy. A brew that
    * the machine's own status speaks against (an alarm, not ready yet, switching
-   * off) is refused first of all, see _assertBrewAllowed.
+   * off), or one that comes while the machine shows a drink or a rinse whose
+   * start the client did not see, is refused first of all, see
+   * _assertBrewAllowed.
    */
   async brew(productName, overrides = {}) {
     // The deadline for sending, worked out here and nowhere else: the first

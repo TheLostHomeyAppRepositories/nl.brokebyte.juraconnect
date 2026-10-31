@@ -537,6 +537,13 @@ class JuraMachineDevice extends Device {
     this._notReadyReason = '';
     this._lastTfAt = null;
     this._progressSinceTf = false;
+    // `_lastProgressAt` is when the newest @TB or @TV: came in (monotonic ms),
+    // null when none did or when a @TS or a @TF: came after it. Unlike the two
+    // above, nothing else clears it: not _resetClient, not the busy reset in
+    // _poll, not a closed connection. A drink or a rinse that started before a
+    // reconnect is still running after it, and the new client did not see it
+    // start.
+    this._lastProgressAt = null;
     // The frame figures of clients thrown away since the previous health line
     // (see _bankStats), added to those of the current client in _logHealth.
     this._healthBanked = emptyBankedStats();
@@ -2207,15 +2214,20 @@ class JuraMachineDevice extends Device {
    * noted before it, a @TB, a @TS or a @TV: is progress after it (a cup or a
    * rinse that the device may have missed the @TB of), any other marker
    * changes nothing. Runs after _applyStatus, so the decision sees the status
-   * this @TF: brought.
+   * this @TF: brought. It also notes when the machine last showed progress
+   * (`_lastProgressAt`: a @TB or a @TV: sets it, a @TS or a @TF: clears it),
+   * which a reconnect keeps, so that a later check can tell that a phase is
+   * running whose start this client did not see.
    * @param {string} reply
    */
   _readinessPush(reply) {
     if (reply.startsWith('@TF:')) {
       this._lastTfAt = this._monotonicNow();
       this._progressSinceTf = false;
+      this._lastProgressAt = null;
     } else if (reply === '@TB' || reply === '@TS' || reply.startsWith('@TV:')) {
       this._progressSinceTf = true;
+      this._lastProgressAt = reply === '@TS' ? null : this._monotonicNow();
     }
     this._updateReadiness();
   }

@@ -6,6 +6,7 @@ const profileLib = require('../../lib/profile');
 const { JuraClient, MachineStatus, AUTH_HASH_RE, PairingTimeout, isMachineClosedError, monotonicMs } = require('../../lib/juraClient');
 const { redactFrame, clipText } = require('../../lib/frameLog');
 const { assertLocalAddress } = require('../../lib/address');
+const { assessReadiness } = require('../../lib/readiness');
 
 // How often to poll @HU? for a status frame while idle. Drives alarms,
 // onoff and available/unavailable -- kept short so those feel
@@ -81,6 +82,22 @@ const NOT_A_FAULT_ALERTS = new Set([SWITCH_OFF_ALERT, 'please_wait', 'heating_up
 // What the tile says from the moment the machine is lost after it announced
 // that it is switching off (see _poll).
 const SWITCHED_OFF_TEXT = 'The machine is switched off.';
+
+// "Ready to brew" (see _updateReadiness). The machine has to stay a candidate
+// (lib/readiness.js) this long before it counts as ready, so the short
+// coffee_ready flicker between a cup and the rinse after it announces nothing.
+// Not in TIMING: a test moves the clock instead.
+const READY_STABLE_MS = 4000;
+
+// How old the newest @TF: may be for the status to count as fresh. The machine
+// sends one about every 2 s, so a status this old means the stream has stopped.
+const READY_FRESH_MS = 10000;
+
+// Obstacles from lib/readiness.js that only say the device does not know, or
+// that its own command is still on its way: they never move the "seen not
+// ready" latch. Every other obstacle, bar `invalid input: ...`, is something
+// the machine showed.
+const READY_UNKNOWN_OBSTACLES = new Set(['not connected', 'no status', 'stale status', 'tile unavailable', 'brew running']);
 
 // Everything about when this device connects again and when its tile goes
 // unavailable. One frozen object: a test scales a copy on the instance
@@ -409,6 +426,9 @@ class JuraMachineDevice extends Device {
     // call failed, null: the warning was cleared), and the capabilities whose
     // last set failed and are set again whatever their value, see there.
     this._appliedRawHex = null;
+    // The parsed status of that raw status, for the "ready to brew" decision
+    // (see _readinessInput): null at the same moments as `_appliedRawHex`.
+    this._appliedStatus = null;
     this._appliedStatusLine = null;
     // The text of the `Maintenance %:` line last written (null: none yet, or
     // the connection was reset since), see _poll.
@@ -491,6 +511,21 @@ class JuraMachineDevice extends Device {
     // monotonic clock) the last brew ended in doubt, null until one did.
     this._brewsRunning = 0;
     this._lastUncertainBrewAt = null;
+    // "Ready to brew", see _updateReadiness. `_readyState` is what this device
+    // has seen since the app started: null unknown, true ready, false seen not
+    // ready. It decides when a ready is announced and survives a reconnect.
+    // `_readySince` is when the current unbroken run of candidate evaluations
+    // began (monotonic ms, null: none), `_readyTimer` the one pending timer
+    // that ends the wait, `_notReadyReason` the obstacles from the moment the
+    // state went to false (for the log only). `_lastTfAt` is when the newest
+    // @TF: came in on the current client (null: none yet) and
+    // `_progressSinceTf` whether a @TB, @TS or @TV: came after it.
+    this._readyState = null;
+    this._readySince = null;
+    this._readyTimer = null;
+    this._notReadyReason = '';
+    this._lastTfAt = null;
+    this._progressSinceTf = false;
     // The frame figures of clients thrown away since the previous health line
     // (see _bankStats), added to those of the current client in _logHealth.
     this._healthBanked = emptyBankedStats();
@@ -645,6 +680,7 @@ class JuraMachineDevice extends Device {
     // Otherwise a pending onSettings deferred-apply (see onSettings
     // below) would still fire after the device is gone.
     if (this._applySettingsTimer) this.homey.clearTimeout(this._applySettingsTimer);
+    this._clearReadyTimer();
     this._pendingSettingsApply.labels = false;
     this._pendingSettingsApply.reconnect = false;
     await this._resetClient('device deleted');
@@ -659,6 +695,7 @@ class JuraMachineDevice extends Device {
   async onUninit() {
     this._stopPolling();
     if (this._applySettingsTimer) this.homey.clearTimeout(this._applySettingsTimer);
+    this._clearReadyTimer();
     this._pendingSettingsApply.labels = false;
     this._pendingSettingsApply.reconnect = false;
     await this._resetClient('device uninit');
@@ -879,12 +916,16 @@ class JuraMachineDevice extends Device {
       // for in the frame that was announced as well, not only in `latest`: it
       // is short, and a newer frame from the same socket packet is what
       // `latest` is by then (see _noteStatusForSwitchOff). The client swallows
-      // whatever the listener throws, so a failure is logged here.
+      // whatever the listener throws, so a failure is logged here. Every push
+      // goes to the "ready to brew" decision afterwards (see _readinessPush),
+      // a @TV: and a marker too: they are the proof that the machine is busy.
       onPush: (reply) => {
         if (this._client !== client) return;
-        if (!reply.startsWith('@TF:')) return;
-        const latest = client.latestStatus;
-        if (!latest) return;
+        const latest = reply.startsWith('@TF:') ? client.latestStatus : null;
+        if (!latest) {
+          this._readinessPush(reply);
+          return;
+        }
         try {
           const pushed = MachineStatus.parse(reply, client.profile);
           this._noteStatusForSwitchOff(pushed);
@@ -892,6 +933,7 @@ class JuraMachineDevice extends Device {
         } catch (err) {
           this.error('Status push could not be applied:', safeText(err.message, LOG_TEXT_MAX));
         }
+        this._readinessPush(reply);
       },
     });
     return client;
@@ -1293,6 +1335,14 @@ class JuraMachineDevice extends Device {
     this._appliedRawHex = null;
     this._appliedStatusLine = null;
     this._loggedMaintenanceLine = null;
+    // What "ready to brew" knows of the old client goes with it: its status, the
+    // time of its last @TF: and the progress after it, and the wait that a run
+    // of candidates had begun. `_readyState` stays, so a reconnect does not make
+    // the machine unknown again (see _updateReadiness).
+    this._appliedStatus = null;
+    this._lastTfAt = null;
+    this._progressSinceTf = false;
+    this._clearReadyTimer();
     this._lastCloseReason = safeText((current.lastCloseReason && current.lastCloseReason.message) || reason);
     this._bankStats(current);
     this._noteSessionEnd();
@@ -1527,6 +1577,7 @@ class JuraMachineDevice extends Device {
     } finally {
       this._polling = false;
       this._updateAvailability();
+      this._updateReadiness();
       this._logHealth();
     }
   }
@@ -1573,6 +1624,7 @@ class JuraMachineDevice extends Device {
     const changed = status.rawHex !== this._appliedRawHex;
     if (!changed && !fromPoll) return;
     this._appliedRawHex = status.rawHex;
+    this._appliedStatus = status;
     const line = status.activeAlerts.join(', ') || '(none)';
     if (changed && line !== this._appliedStatusLine) {
       this._appliedStatusLine = line;
@@ -2051,6 +2103,138 @@ class JuraMachineDevice extends Device {
     } catch (err) {
       this.error('Health line failed:', err.message);
     }
+  }
+
+  // ---------- ready to brew ----------
+
+  /**
+   * Cancels the pending ready timer, if any, and forgets the run of candidate
+   * evaluations it belonged to. Safe to call at any time.
+   */
+  _clearReadyTimer() {
+    if (this._readyTimer !== null) this.homey.clearTimeout(this._readyTimer);
+    this._readyTimer = null;
+    this._readySince = null;
+  }
+
+  /**
+   * The facts lib/readiness.js decides on, as they are right now. Reads only:
+   * the client's connection and brew phase, the brews of this device that are
+   * running, the status `_applyStatus` applied last (never parsed again here),
+   * and the switched-off and availability state. The status counts as fresh
+   * when the newest @TF: is younger than READY_FRESH_MS and no @TB, @TS or @TV:
+   * came after it.
+   * @returns {object} the input of assessReadiness
+   */
+  _readinessInput() {
+    const client = this._client;
+    const now = this._monotonicNow();
+    return {
+      connected: client !== null && client.connected,
+      inBrewPhase: client !== null && client.inBrewPhase(),
+      brewsRunning: this._brewsRunning,
+      statusIsFresh: !this._progressSinceTf && this._lastTfAt !== null && now - this._lastTfAt < READY_FRESH_MS,
+      status: this._appliedStatus,
+      switchedOff: this._switchedOff,
+      tileUnavailable: this._available === false,
+    };
+  }
+
+  /**
+   * The bookkeeping for one push of the machine (see onPush in _buildClient),
+   * then the decision: a @TF: is the newest status and clears the progress
+   * noted before it, a @TB, a @TS or a @TV: is progress after it (a cup or a
+   * rinse that the device may have missed the @TB of), any other marker
+   * changes nothing. Runs after _applyStatus, so the decision sees the status
+   * this @TF: brought.
+   * @param {string} reply
+   */
+  _readinessPush(reply) {
+    if (reply.startsWith('@TF:')) {
+      this._lastTfAt = this._monotonicNow();
+      this._progressSinceTf = false;
+    } else if (reply === '@TB' || reply === '@TS' || reply.startsWith('@TV:')) {
+      this._progressSinceTf = true;
+    }
+    this._updateReadiness();
+  }
+
+  /**
+   * Whether the machine is ready to brew now: it has been seen ready (the
+   * latch, see _updateReadiness) and nothing blocks at this moment. Never
+   * throws; any failure counts as not ready.
+   * @returns {boolean}
+   */
+  isReadyToBrew() {
+    try {
+      return this._readyState === true && assessReadiness(this._readinessInput()).candidate;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * The one place the "ready to brew" state changes, called after every push,
+   * after every poll and by the timer. `_readyState` is a latch:
+   *  - not a candidate: the wait is cancelled. The latch goes to false only
+   *    for something the machine showed (an alarm, a busy state, a brew phase,
+   *    no coffee_ready, switched off, or progress frames after the last @TF:),
+   *    never for what the device just does not know (READY_UNKNOWN_OBSTACLES),
+   *    so a short glitch in the connection announces nothing afterwards. Only
+   *    a change from true to false is logged: the first one after the app
+   *    started (null) is not, a machine that is busy at that moment is normal.
+   *  - a candidate for READY_STABLE_MS in a row: the latch goes to true. When
+   *    it was false that is announced (see _onReadyToBrew); from unknown it is
+   *    not, an app that starts while the machine is ready has seen no change.
+   * The wait is one timer that is armed with the first candidate evaluation and
+   * never extended: pushes come every 2 s, a timer re-armed by each of them
+   * would never fire. When it fires, everything is assessed again.
+   */
+  _updateReadiness() {
+    try {
+      const result = assessReadiness(this._readinessInput());
+      if (!result.candidate) {
+        this._clearReadyTimer();
+        const seen = (obstacle) => !READY_UNKNOWN_OBSTACLES.has(obstacle) && !obstacle.startsWith('invalid input');
+        if (this._readyState !== false && (this._progressSinceTf || result.obstacles.some(seen))) {
+          if (this._readyState === true) this.log(`Machine not ready: ${result.reason}.`);
+          this._readyState = false;
+          this._notReadyReason = result.reason;
+        }
+        return;
+      }
+      if (this._readyState === true) return;
+      const now = this._monotonicNow();
+      if (this._readySince === null) this._readySince = now;
+      const restMs = this._readySince + READY_STABLE_MS - now;
+      if (restMs > 0) {
+        if (this._readyTimer === null) {
+          this._readyTimer = this.homey.setTimeout(() => {
+            this._readyTimer = null;
+            this._updateReadiness();
+          }, restMs);
+        }
+        return;
+      }
+      this._clearReadyTimer();
+      const announce = this._readyState === false;
+      this._readyState = true;
+      if (announce) this._onReadyToBrew(this._notReadyReason);
+      else this.log('Machine ready to brew (first state after app start, not announced).');
+    } catch (err) {
+      this.error('Ready state could not be updated:', safeText(err.message, LOG_TEXT_MAX));
+    }
+  }
+
+  /**
+   * Called once for every announced change from not ready to ready, after the
+   * state is true, and never for the first ready after the app started. For
+   * now it only writes the log line; `reason` (what the machine was not ready
+   * for) is for the log and goes nowhere else.
+   * @param {string} reason
+   */
+  _onReadyToBrew(reason) {
+    this.log(`Machine ready to brew (was not ready: ${reason}).`);
   }
 
   // ---------- flow actions (registered in app.js) ----------

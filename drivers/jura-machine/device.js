@@ -117,6 +117,14 @@ const READY_UNKNOWN_OBSTACLES = new Set(['not connected', 'no status', 'stale st
 // backoff). Not in TIMING: a test moves the clock instead.
 const MISSED_PHASE_HOLD_MS = 120000;
 
+// How long a brew series stays quiet after a tick saw another brew command of
+// this device in flight (a tap, a second flow). That brew lasts at least the
+// 1.5 s accept grace, so a tick sees it, but its @TB may come a few seconds
+// after the accept. Until this time has passed, the series does not send the
+// next cup unless progress came in since that tick. Not in TIMING: a test moves
+// the clock instead.
+const SERIES_QUIET_MS = 5000;
+
 // What the user is told for that refusal. It says "machine is busy" on
 // purpose, like the client's own BREW_BUSY text.
 const MISSED_PHASE_BUSY_TEXT =
@@ -2504,7 +2512,7 @@ class JuraMachineDevice extends Device {
       this.log(`Brew series not started (${label}): another series is running.`);
       throw new Error(ALREADY_TEXT);
     }
-    const series = { productName, label, overrides, requested, started: 0, acceptedAt: 0, cupSeen: false, lastObstacle: '', readyTicks: 0, sending: true, cancelled: null };
+    const series = { productName, label, overrides, requested, started: 0, acceptedAt: 0, cupSeen: false, lastObstacle: '', readyTicks: 0, quietUntil: null, sending: true, cancelled: null };
     this._series = series;
     this.log(`Brew series (${label}, ${requested} cups): cup 1.`);
     try {
@@ -2563,6 +2571,7 @@ class JuraMachineDevice extends Device {
     // after the previous cup may carry over.
     series.lastObstacle = '';
     series.readyTicks = 0;
+    series.quietUntil = null;
     series.cupSeen = this._seriesCupSeen(series);
   }
 
@@ -2599,7 +2608,9 @@ class JuraMachineDevice extends Device {
    * the machine ready again so that the next cup goes. The next cup goes only
    * when the cup was seen, the machine is ready, no other brew of this device
    * is in flight (_brewsRunning is 0) and that held on two consecutive ticks
-   * (readyTicks). The last obstacle shown in the timeout text is the most
+   * (readyTicks). A tick that sees another brew in flight also holds the series
+   * for SERIES_QUIET_MS (quietUntil), unless progress came in since that tick.
+   * The last obstacle shown in the timeout text is the most
    * specific one of the current cup (reset per cup). Otherwise it arms the
    * timer again. The whole body is guarded: a throw ends the series (an
    * unhandled throw in a timer would leave it hanging and refuse every new one).
@@ -2624,8 +2635,14 @@ class JuraMachineDevice extends Device {
       }
       // Ready means: the cup was seen, the machine is ready and no other brew
       // command of this device is in flight. The next cup goes on the second
-      // consecutive ready tick, so a late @TB of another brew (a tap, a second
-      // flow) cannot be run into.
+      // consecutive ready tick. A brew of another flow or a tap lasts at least
+      // the accept grace, so a tick sees it in flight (_brewsRunning > 0) and
+      // holds the series for SERIES_QUIET_MS from then on. Its late @TB would
+      // end that hold early (progress seen after the tick), so a foreign brew
+      // seen in flight holds the series unless its progress is seen.
+      if (this._brewsRunning > 0) series.quietUntil = now + SERIES_QUIET_MS;
+      const quiet = series.quietUntil === null || now >= series.quietUntil ||
+        (this._lastProgressAt !== null && this._lastProgressAt >= series.quietUntil - SERIES_QUIET_MS);
       const readyNow = series.cupSeen && this.isReadyToBrew() && this._brewsRunning === 0;
       const readyBefore = series.readyTicks >= 1;
       series.readyTicks = readyNow ? series.readyTicks + 1 : 0;
@@ -2642,7 +2659,7 @@ class JuraMachineDevice extends Device {
         const obstacle = safeText(series.lastObstacle || 'unknown', LOG_TEXT_MAX);
         const reason = series.cupSeen ? notReadyText(series.started, obstacle) : notSeenText(series.started);
         this._endBrewSeries(series, { reason, notify: true });
-      } else if (readyNow && readyBefore) {
+      } else if (readyNow && readyBefore && quiet) {
         this._seriesSendNext(series).catch((err) => {
           this.error('Brew series step failed:', safeText(err && err.message, LOG_TEXT_MAX));
           this._endBrewSeries(series, { reason: INTERNAL_TEXT, notify: false });

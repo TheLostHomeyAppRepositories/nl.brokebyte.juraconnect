@@ -2709,12 +2709,12 @@ class JuraMachineDevice extends Device {
    * @param {object} outcome
    * @param {string} outcome.reason what ends up in the log and the `reason` token
    * @param {boolean} [outcome.notify] the stop came from the machine or the link
-   *   (attention, switching off, a timeout, a failed brew command): for the
-   *   timeline message of a later step, not used yet
+   *   (attention, switching off, a timeout, a failed brew command): one
+   *   timeline message on top of the trigger (see _seriesNotify)
    * @param {boolean} [outcome.silent] the app stops or the device goes: log only,
    *   no trigger
    */
-  _endBrewSeries(series, { reason, silent = false }) {
+  _endBrewSeries(series, { reason, notify = false, silent = false }) {
     if (!series || this._series !== series) return;
     if (this._seriesTimer !== null) this.homey.clearTimeout(this._seriesTimer);
     this._seriesTimer = null;
@@ -2735,6 +2735,27 @@ class JuraMachineDevice extends Device {
         .catch(failed);
     } catch (err) {
       failed(err);
+    }
+    if (notify === true) {
+      this._seriesNotify(
+        `**${safeText(this.getName())}**: the brew series stopped after ${series.started} of ${series.requested} cups. ${text}`
+      );
+    }
+  }
+
+  /**
+   * One timeline notification for a series that stopped because of the machine or the link.
+   * It never throws: a failure (also a missing notifications manager) is one error line.
+   * @param {string} text
+   */
+  _seriesNotify(text) {
+    try {
+      const p = this.homey.notifications.createNotification({ excerpt: text });
+      if (p && typeof p.catch === 'function') {
+        p.catch((err) => this.error('Brew series notification failed:', safeText(err && err.message, LOG_TEXT_MAX)));
+      }
+    } catch (err) {
+      this.error('Brew series notification failed:', safeText(err && err.message, LOG_TEXT_MAX));
     }
   }
 

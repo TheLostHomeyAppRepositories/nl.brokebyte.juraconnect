@@ -51,6 +51,11 @@ On the E4 (EF1031), the "Brew a product" card also offers "2x Espresso"
 and "2x Coffee" from version 0.14.0. The machine data of that model
 marks them as inactive, so they were never offered before. They have
 not been confirmed on a real E4 yet; a report helps here too.
+"2x Espresso" has since been brewed on a real E4 through the "Brew a
+product" card (one brew with two cycles). "2x Coffee" is still not
+confirmed on a real E4. The 2x buttons (see Features) follow for the E4
+once both are confirmed. The 2x products of the E4 have no strength
+setting in Jura's data, so the machine uses its own default strength.
 
 ## Pairing
 
@@ -93,6 +98,7 @@ While it connects, two things can come up:
 | `jura_maintenance_cleaning` / `_filter` / `_descale` | Percent until due, higher = sooner |
 | `brew_coffee_button` / `brew_espresso_button` | Quick-brew buttons on the device tile |
 | `brew_hotwater_button` | Same, only added on machines that actually have this product |
+| `brew_espresso_double_button` / `brew_coffee_double_button` | "Brew 2x espresso" and "Brew 2x coffee", only added on machines whose data has an active 2-cup espresso and 2-cup coffee (44 of the bundled models; not yet the E4, see the E4 note). They brew the machine's own 2-cup product at its default amount; the Coffee and Espresso amount and strength settings do not apply. Paired devices get them at the first start of 0.15.0. They are only removed when the machine model in the settings changes |
 
 Flow cards: a "Brew a product" action covering any product your
 specific machine has, with an optional strength argument; a trigger
@@ -133,6 +139,32 @@ Since 0.14.0 there are also:
   Homey (the toggle on the tile, or Homey's own cards for switching on
   and off) is still refused with a message: the dongle ignores that
   command, see Known limitations.
+
+Since 0.15.0 there are also:
+
+- "Brew a product several times" (action): a product, 1 to 5 cups and
+  an optional strength. The card is done once the machine accepts the
+  first cup. The app brews each next cup once the previous cup was seen
+  and the machine is ready to brew again (the same rule as the ready
+  trigger, on two checks in a row). There is no pause in between, so the
+  cups go into whatever is under the spout. The series stops when the
+  machine needs attention or switches off, when a cup is not seen or
+  the machine is not ready again within 4 minutes after it accepted a
+  cup, when a brew command fails, on the stop card, on a change of the
+  connection settings, and when the app or Homey restarts (the
+  remaining cups are not brewed later). A model that does not report
+  "coffee ready" gets only the first cup.
+- "Stop the brew series" (action): stops the series after the cup that
+  is on its way.
+- "A brew series ended" (trigger): fires once per series, with the
+  tokens Cups accepted, Cups asked, All cups accepted and Reason. An
+  accepted cup is a command the machine took, not proof that a cup came
+  out. When the machine stops a series (attention, switching off, a
+  timeout, a failed brew command) there is also one timeline message.
+- Do not start a series from "Machine became ready to brew" or from
+  "A brew series ended": that loops.
+- Other taps and flows are not blocked during a series. After one, the
+  series waits a few seconds before its next cup.
 
 ### How it behaves
 
@@ -233,6 +265,12 @@ manual IP field, see Known limitations.
   against the logs of one machine (an E8). A programme that is broken
   off, or another model, may behave differently; a report helps.
 - There's no way to remotely abort a brew already in progress.
+- A brew series is not resumed after a restart of the app or Homey: the
+  remaining cups are not brewed later.
+- A cup counted by a brew series is a command the machine accepted, not
+  proof that a cup was delivered.
+- Other brews (a tap, another flow) are not blocked during a series, so
+  they can come in between the cups of a series.
 
 ## LAN security
 

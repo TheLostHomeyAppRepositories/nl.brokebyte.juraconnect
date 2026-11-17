@@ -1,0 +1,10 @@
+<!-- Custom icon for the brew_espresso_double_button capability: two of the
+     short, squat espresso cups of button_espresso.svg side by side, to say
+     "two cups". Matches the other buttons: white stroke-only outline, same
+     100x100 viewBox, stroke width 6. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path d="M8 50 h28 l-2 22 a4 4 0 0 1 -4 4 h-18 a4 4 0 0 1 -4 -4 z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M36 55 a7 7 0 0 1 0 14" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M52 50 h28 l-2 22 a4 4 0 0 1 -4 4 h-18 a4 4 0 0 1 -4 -4 z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M80 55 a7 7 0 0 1 0 14" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+</svg>

@@ -221,6 +221,36 @@
       "setable": true,
       "uiComponent": "button",
       "icon": "/drivers/jura-machine/assets/button_hotwater.svg"
+    },
+    "brew_espresso_double_button": {
+      "type": "boolean",
+      "title": {
+        "en": "Brew 2x espresso",
+        "nl": "Zet 2x espresso"
+      },
+      "desc": {
+        "en": "Starts the machine's own 2-cup espresso product (called 2 Espressi or 2x Espresso, depending on the model) with the default amount from the machine data; the Coffee and Espresso amount and strength settings do not apply. No remote abort once started: make sure cups are in place. Only shown on machines that have this product.",
+        "nl": "Start het eigen 2-kops espressoproduct van de machine (heet 2 Espressi of 2x Espresso, afhankelijk van het model) met de standaardhoeveelheid uit de machinegegevens; de instellingen voor hoeveelheid en sterkte van Koffie en Espresso gelden hier niet. Geen externe stop mogelijk zodra gestart: zorg dat er kopjes klaarstaan. Wordt alleen getoond op machines die dit product hebben."
+      },
+      "getable": false,
+      "setable": true,
+      "uiComponent": "button",
+      "icon": "/drivers/jura-machine/assets/button_espresso_double.svg"
+    },
+    "brew_coffee_double_button": {
+      "type": "boolean",
+      "title": {
+        "en": "Brew 2x coffee",
+        "nl": "Zet 2x koffie"
+      },
+      "desc": {
+        "en": "Starts the machine's own 2-cup coffee product (called 2 Coffee or 2x Coffee, depending on the model) with the default amount from the machine data; the Coffee and Espresso amount and strength settings do not apply. No remote abort once started: make sure cups are in place. Only shown on machines that have this product.",
+        "nl": "Start het eigen 2-kops koffieproduct van de machine (heet 2 Coffee of 2x Coffee, afhankelijk van het model) met de standaardhoeveelheid uit de machinegegevens; de instellingen voor hoeveelheid en sterkte van Koffie en Espresso gelden hier niet. Geen externe stop mogelijk zodra gestart: zorg dat er kopjes klaarstaan. Wordt alleen getoond op machines die dit product hebben."
+      },
+      "getable": false,
+      "setable": true,
+      "uiComponent": "button",
+      "icon": "/drivers/jura-machine/assets/button_coffee_double.svg"
     }
   },
   "drivers": [

@@ -582,6 +582,7 @@ class JuraMachineDevice extends Device {
     // distinction matters).
     this._pendingSettingsApply = { labels: false, reconnect: false };
     await this._syncHotwaterCapability();
+    await this._syncDoubleButtons(); // adds only: never removes at startup
     await this._syncStrengthOptionLabels();
 
     // Which machine this is, for a user who has to tell us: the article number
@@ -614,12 +615,12 @@ class JuraMachineDevice extends Device {
     });
 
     // Quick-access buttons. Coffee/espresso are the only two products
-    // every bundled profile has, so these two are always added (see
-    // README.md's "Why only 2 quick buttons" note for why there isn't
-    // a wider fixed menu here) -- brew_hotwater_button is the one
-    // exception, conditionally added below since not every machine has
-    // hot water. brew_product (the flow action) stays the flexible,
-    // per-device route for anything else a specific machine supports.
+    // every bundled profile has, so these two are always added, with no
+    // wider fixed menu -- brew_hotwater_button and the two 2-cup buttons
+    // (_syncDoubleButtons) are the exceptions, conditionally added since
+    // not every machine has those products. brew_product (the flow action)
+    // stays the flexible, per-device route for anything else a specific
+    // machine supports.
     this.registerCapabilityListener('brew_coffee_button', async () => {
       this.log('button brew_coffee_button');
       await this.brew('coffee');
@@ -635,6 +636,16 @@ class JuraMachineDevice extends Device {
     this.registerCapabilityListener('brew_hotwater_button', async () => {
       this.log('button brew_hotwater_button');
       await this.brew(this._hotwaterProductName);
+    });
+    this.registerCapabilityListener('brew_espresso_double_button', async () => {
+      this.log('button brew_espresso_double_button');
+      if (!this._doubleProductNames.espresso) throw new Error('This machine has no 2-cup espresso.');
+      await this.brew(this._doubleProductNames.espresso);
+    });
+    this.registerCapabilityListener('brew_coffee_double_button', async () => {
+      this.log('button brew_coffee_double_button');
+      if (!this._doubleProductNames.coffee) throw new Error('This machine has no 2-cup coffee.');
+      await this.brew(this._doubleProductNames.coffee);
     });
 
     await this._startPolling();
@@ -671,6 +682,39 @@ class JuraMachineDevice extends Device {
       }
     } else if (this.hasCapability('brew_hotwater_button')) {
       await this.removeCapability('brew_hotwater_button').catch(this.error);
+    }
+  }
+
+  /**
+   * Add (or, only when allowRemove is true, remove) the two 2-cup buttons
+   * brew_espresso_double_button and brew_coffee_double_button, depending on
+   * whether this device's profile has the machine's own 2-cup espresso and
+   * 2-cup coffee product (see doubleProducts in lib/brewChoices.js). Same
+   * pattern as _syncHotwaterCapability: `settings` defaults to the saved
+   * settings, onSettings passes newSettings. The resolved product names are
+   * kept in this._doubleProductNames for the button listeners. onInit calls
+   * this with allowRemove false, so a start never takes a button away; only
+   * a profile_code change in onSettings may.
+   */
+  async _syncDoubleButtons(settings = this.getSettings(), { allowRemove = false } = {}) {
+    const found = require('../../lib/brewChoices').doubleProducts(this._resolveProfile(settings));
+    this._doubleProductNames = {
+      espresso: found.espresso ? found.espresso.name : null,
+      coffee: found.coffee ? found.coffee.name : null,
+    };
+    const kinds = [
+      ['brew_espresso_double_button', 'espresso', '/drivers/jura-machine/assets/button_espresso_double.svg'],
+      ['brew_coffee_double_button', 'coffee', '/drivers/jura-machine/assets/button_coffee_double.svg'],
+    ];
+    for (const [capability, kind, icon] of kinds) {
+      if (this._doubleProductNames[kind]) {
+        if (!this.hasCapability(capability)) {
+          await this.addCapability(capability).catch(this.error);
+          this.setCapabilityOptions(capability, { icon }).catch(this.error);
+        }
+      } else if (allowRemove && this.hasCapability(capability)) {
+        await this.removeCapability(capability).catch(this.error);
+      }
     }
   }
 
@@ -821,6 +865,7 @@ class JuraMachineDevice extends Device {
       // (see that method's own doc comment). Only touches capabilities,
       // so unlike the label sync below it's safe to run right away.
       await this._syncHotwaterCapability(newSettings);
+      await this._syncDoubleButtons(newSettings, { allowRemove: true });
     }
     if (changedKeys.includes('address') || changedKeys.includes('profile_code')) {
       this.log('Connection settings changed, reconnecting...');

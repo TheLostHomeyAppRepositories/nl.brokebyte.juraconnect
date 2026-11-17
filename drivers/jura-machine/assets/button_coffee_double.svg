@@ -1,0 +1,10 @@
+<!-- Custom icon for the brew_coffee_double_button capability: two cups side
+     by side, to say "two cups", in the style of button_coffee.svg. Matches
+     the other buttons: white stroke-only outline, same 100x100 viewBox,
+     stroke width 6. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path d="M8 24 h28 l-3 46 a5 5 0 0 1 -5 5 h-12 a5 5 0 0 1 -5 -5 z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M36 36 a9 9 0 0 1 0 18" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M52 24 h28 l-3 46 a5 5 0 0 1 -5 5 h-12 a5 5 0 0 1 -5 -5 z" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M80 36 a9 9 0 0 1 0 18" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+</svg>

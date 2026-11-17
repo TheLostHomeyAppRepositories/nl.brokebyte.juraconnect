@@ -156,7 +156,8 @@ Since 0.15.0 there are also:
   "coffee ready" gets only the first cup.
 - "Stop the brew series" (action): stops the series after the cup that
   is on its way.
-- "A brew series ended" (trigger): fires once per series, with the
+- "A brew series ended" (trigger): fires once per series (not when the
+  app or Homey restarts), with the
   tokens Cups accepted, Cups asked, All cups accepted and Reason. An
   accepted cup is a command the machine took, not proof that a cup came
   out. When the machine stops a series (attention, switching off, a

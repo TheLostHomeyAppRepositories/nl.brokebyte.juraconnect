@@ -7,7 +7,7 @@ const { JuraClient, MachineStatus, AUTH_HASH_RE, PairingTimeout, isMachineClosed
 const { redactFrame, clipText } = require('../../lib/frameLog');
 const { assertLocalAddress } = require('../../lib/address');
 const { assessReadiness, brewBlockers, READY_ALERT } = require('../../lib/readiness');
-const { SERIES_CUP_WAIT_MS, SERIES_TICK_MS, COUNT_TEXT, ALREADY_TEXT, STOPPED_TEXT, SETTINGS_TEXT, INTERNAL_TEXT, cupCount, seriesStop, stopText, completedText, notSeenText, notReadyText } = require('../../lib/brewSeries');
+const { SERIES_CUP_WAIT_MS, SERIES_TICK_MS, COUNT_TEXT, ALREADY_TEXT, STOPPING_TEXT, STOPPED_TEXT, SETTINGS_TEXT, INTERNAL_TEXT, cupCount, seriesStop, stopText, completedText, notSeenText, notReadyText } = require('../../lib/brewSeries');
 
 // How often to poll @HU? for a status frame while idle. Drives alarms,
 // onoff and available/unavailable -- kept short so those feel
@@ -2555,7 +2555,7 @@ class JuraMachineDevice extends Device {
     const label = safeText(String(productName).trim());
     if (this._series) {
       this.log(`Brew series not started (${label}): another series is running.`);
-      throw new Error(ALREADY_TEXT);
+      throw new Error(this._series.cancelled !== null ? STOPPING_TEXT : ALREADY_TEXT);
     }
     const series = { productName, label, overrides, requested, started: 0, acceptedAt: 0, cupSeen: false, lastObstacle: '', readyTicks: 0, quietUntil: null, sending: true, cancelled: null };
     this._series = series;
@@ -2695,7 +2695,7 @@ class JuraMachineDevice extends Device {
       const stop = seriesStop({
         fresh,
         status: input.status,
-        switchedOff: this._switchedOff,
+        switchedOff: this._switchedOff && !fresh,
         switchOffWindowOpen: this._switchOffWindowOpen(now),
       });
       if (stop) {

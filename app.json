@@ -1430,8 +1430,8 @@
           "nl": "Een zetreeks is afgelopen"
         },
         "hint": {
-          "en": "Fires once per series, when the machine accepted the last cup or when the series stopped early. The reason says why.",
-          "nl": "Gaat een keer af per reeks: als de machine de laatste kop aannam of als de reeks eerder stopte. De reden zegt waarom."
+          "en": "Fires once per series, when the machine accepted the last cup or when the series stopped early, but not when the app or Homey restarts. The reason says why.",
+          "nl": "Gaat een keer af per reeks: als de machine de laatste kop aannam of als de reeks eerder stopte, maar niet als de app of Homey herstart. De reden zegt waarom."
         },
         "args": [
           {

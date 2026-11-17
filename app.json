@@ -1032,6 +1032,71 @@
             }
           }
         ]
+      },
+      {
+        "id": "brew_series",
+        "title": {
+          "en": "Brew a product several times",
+          "nl": "Zet een product meerdere keren"
+        },
+        "titleFormatted": {
+          "en": "Brew [[product]] [[count]] times at strength [[strength]]",
+          "nl": "Zet [[count]] keer [[product]] op sterkte [[strength]]"
+        },
+        "hint": {
+          "en": "Brews the first cup right away; the card is done as soon as the machine accepts it. The app then brews each next cup as soon as the machine is ready again, with no pause in between. The series stops early when the machine needs attention, is switching off, or is not ready again within 4 minutes after it accepted a cup, when a brew command fails, and when the app or Homey restarts. Use the card A brew series ended to act on the outcome. Do not start this card from the Machine became ready to brew trigger. Every cup goes into whatever is under the spout.",
+          "nl": "Zet de eerste kop meteen; de kaart is klaar zodra de machine die aanneemt. Daarna zet de app elke volgende kop zodra de machine weer klaar is, zonder pauze ertussen. De reeks stopt eerder als de machine om iets vraagt, uitschakelt of niet binnen 4 minuten na het aannemen van een kop weer klaar is, als een zetopdracht mislukt, en als de app of Homey herstart. Gebruik de kaart Een zetreeks is afgelopen om op de uitkomst te reageren. Start deze kaart niet vanuit de trigger Machine werd klaar om te zetten. Elke kop komt in wat er onder de uitloop staat."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=jura-machine"
+          },
+          {
+            "name": "product",
+            "type": "autocomplete",
+            "placeholder": {
+              "en": "Choose a product",
+              "nl": "Kies een product"
+            }
+          },
+          {
+            "name": "count",
+            "type": "number",
+            "min": 1,
+            "max": 5,
+            "step": 1,
+            "placeholder": { "en": "3", "nl": "3" }
+          },
+          {
+            "name": "strength",
+            "type": "autocomplete",
+            "required": false,
+            "placeholder": {
+              "en": "Strength (default)",
+              "nl": "Sterkte (standaard)"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop_brew_series",
+        "title": {
+          "en": "Stop the brew series",
+          "nl": "Stop de zetreeks"
+        },
+        "hint": {
+          "en": "Stops a running brew series: no further cup is sent. A cup that is already being brewed is not stopped.",
+          "nl": "Stopt een lopende zetreeks: er wordt geen volgende kop meer gestuurd. Een kop die al gezet wordt, stopt niet."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=jura-machine"
+          }
+        ]
       }
     ],
     "triggers": [
@@ -1325,6 +1390,50 @@
             "name": "device",
             "type": "device",
             "filter": "driver_id=jura-machine"
+          }
+        ]
+      },
+      {
+        "id": "brew_series_ended",
+        "title": {
+          "en": "A brew series ended",
+          "nl": "Een zetreeks is afgelopen"
+        },
+        "hint": {
+          "en": "Fires once per series, when the machine accepted the last cup or when the series stopped early. The reason says why.",
+          "nl": "Gaat een keer af per reeks: als de machine de laatste kop aannam of als de reeks eerder stopte. De reden zegt waarom."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=jura-machine"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "cups",
+            "type": "number",
+            "title": { "en": "Cups accepted", "nl": "Geaccepteerde koppen" },
+            "example": 2
+          },
+          {
+            "name": "requested",
+            "type": "number",
+            "title": { "en": "Cups asked", "nl": "Gevraagde koppen" },
+            "example": 3
+          },
+          {
+            "name": "completed",
+            "type": "boolean",
+            "title": { "en": "All cups accepted", "nl": "Alle koppen geaccepteerd" },
+            "example": false
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "title": { "en": "Reason", "nl": "Reden" },
+            "example": "The machine needs attention (fill water)."
           }
         ]
       }

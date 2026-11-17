@@ -4,6 +4,7 @@ const { App } = require('homey');
 const models = require('./lib/models');
 const profileLib = require('./lib/profile');
 const brewChoices = require('./lib/brewChoices');
+const { cupCount, COUNT_TEXT } = require('./lib/brewSeries');
 
 class JuraConnectApp extends App {
 
@@ -161,6 +162,63 @@ class JuraConnectApp extends App {
     this.homey.flow
       .getConditionCard('machine_is_ready')
       .registerRunListener(async ({ device }) => device.isReadyToBrew());
+
+    // "Brew a product several times" and its stop card. The run listener
+    // repeats the strength check of brew_product on purpose: the released
+    // brew_product listener above stays untouched. Cup 1 goes out through
+    // device.startBrewSeries; the device sends the next cups itself.
+    const seriesAction = this.homey.flow.getActionCard('brew_series');
+
+    seriesAction.registerRunListener(async (args) => {
+      // A flow token can bypass the min and max of the number field.
+      const count = cupCount(args.count);
+      if (count === null) throw new Error(COUNT_TEXT);
+      const overrides = {};
+      if (args.strength && args.strength.id) {
+        const product = getDeviceProfile(args.device).products.find((p) => p.name === args.product.id);
+        const strengthParam = product && product.params.find((p) => p.kind === 'coffee_strength');
+        if (strengthParam) {
+          if (!strengthParam.items.some((it) => it.name === args.strength.id)) {
+            throw new Error(
+              `Pick the strength again in this card: "${args.strength.id}" is not available for ${product.rawName}.`
+            );
+          }
+          overrides.coffee_strength = args.strength.id;
+        }
+      }
+      await args.device.startBrewSeries(args.product.id, overrides, count);
+      return true;
+    });
+
+    // Same product and strength lists as brew_product.
+    seriesAction.registerArgumentAutocompleteListener('product', async (query, args) => {
+      const profile = getDeviceProfile(args.device);
+      const q = query.trim().toLowerCase();
+      return brewChoices
+        .offeredProducts(profile)
+        .filter(buildsWithoutOverrides)
+        .filter((p) => !q || p.rawName.toLowerCase().includes(q) || p.name.includes(q))
+        .map((p) => ({ id: p.name, name: p.rawName }));
+    });
+
+    seriesAction.registerArgumentAutocompleteListener('strength', async (query, args) => {
+      if (!args.product) return [];
+      const profile = getDeviceProfile(args.device);
+      const product = profile.products.find((p) => p.name === args.product.id);
+      const strengthParam = product && product.params.find((p) => p.kind === 'coffee_strength');
+      if (!strengthParam) return [];
+      const q = query.trim().toLowerCase();
+      return strengthParam.items
+        .filter((it) => !q || it.name.toLowerCase().includes(q))
+        .map((it) => ({ id: it.name, name: prettify(it.name) }));
+    });
+
+    this.homey.flow.getActionCard('stop_brew_series').registerRunListener(async (args) => {
+      args.device.stopBrewSeries();
+      return true;
+    });
+
+    // brew_series_ended is fired by the device itself and needs no listener.
   }
 
 }

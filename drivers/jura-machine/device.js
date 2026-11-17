@@ -2543,7 +2543,8 @@ class JuraMachineDevice extends Device {
    * brew_series_ended tells how the series ended.
    *
    * One series per device: `_series` is set before the first await, so a second
-   * call in the same tick is refused too (ALREADY_TEXT, nothing sent).
+   * call in the same tick is refused too (ALREADY_TEXT, nothing sent). While a
+   * stop is pending for the cup on its way, the refusal is STOPPING_TEXT.
    * @param {string} productName as brew() takes it
    * @param {object} overrides as brew() takes them
    * @param {number} count 1 to MAX_CUPS (checked again here, app.js checks first)
@@ -2692,10 +2693,15 @@ class JuraMachineDevice extends Device {
       const readyBefore = series.readyTicks >= 1;
       series.readyTicks = readyNow ? series.readyTicks + 1 : 0;
       const fresh = input.statusIsFresh && !input.inBrewPhase && input.status !== null;
+      // Every failed poll resets its client and so does onClose, and a switched-off
+      // machine has no TCP session. A connected client while the flag is set is
+      // therefore a session made after the switch-off (the machine is on again),
+      // or one made inside the switch-off window, which stops the series anyway.
+      // The switch-off window and a fresh switch_off_delay_active still stop.
       const stop = seriesStop({
         fresh,
         status: input.status,
-        switchedOff: this._switchedOff && !fresh,
+        switchedOff: this._switchedOff && !input.connected,
         switchOffWindowOpen: this._switchOffWindowOpen(now),
       });
       if (stop) {

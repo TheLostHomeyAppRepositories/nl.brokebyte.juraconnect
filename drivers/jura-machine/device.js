@@ -7,6 +7,7 @@ const { JuraClient, MachineStatus, AUTH_HASH_RE, PairingTimeout, isMachineClosed
 const { redactFrame, clipText } = require('../../lib/frameLog');
 const { assertLocalAddress } = require('../../lib/address');
 const { assessReadiness, brewBlockers, READY_ALERT } = require('../../lib/readiness');
+const { SERIES_CUP_WAIT_MS, SERIES_TICK_MS, COUNT_TEXT, ALREADY_TEXT, STOPPED_TEXT, SETTINGS_TEXT, INTERNAL_TEXT, cupCount, seriesStop, stopText, completedText, notSeenText, notReadyText } = require('../../lib/brewSeries');
 
 // How often to poll @HU? for a status frame while idle. Drives alarms,
 // onoff and available/unavailable -- kept short so those feel
@@ -556,6 +557,11 @@ class JuraMachineDevice extends Device {
     // reconnect is still running after it, and the new client did not see it
     // start.
     this._lastProgressAt = null;
+    // The "brew a product several times" series that runs on this device, or
+    // null (see startBrewSeries), and the one timer that watches it between
+    // two cups. Not persisted: after a restart there is no series.
+    this._series = null;
+    this._seriesTimer = null;
     // The frame figures of clients thrown away since the previous health line
     // (see _bankStats), added to those of the current client in _logHealth.
     this._healthBanked = emptyBankedStats();
@@ -713,6 +719,8 @@ class JuraMachineDevice extends Device {
     this._clearReadyTimer();
     this._pendingSettingsApply.labels = false;
     this._pendingSettingsApply.reconnect = false;
+    // Before the client goes: a series that ends here is silent (log only).
+    if (this._series) this._endBrewSeries(this._series, { reason: 'The device was deleted.', silent: true });
     await this._resetClient('device deleted');
   }
 
@@ -728,6 +736,8 @@ class JuraMachineDevice extends Device {
     this._clearReadyTimer();
     this._pendingSettingsApply.labels = false;
     this._pendingSettingsApply.reconnect = false;
+    // Before the client goes: a series that ends here is silent (log only).
+    if (this._series) this._endBrewSeries(this._series, { reason: 'The app stopped.', silent: true });
     await this._resetClient('device uninit');
   }
 
@@ -806,6 +816,9 @@ class JuraMachineDevice extends Device {
     }
     if (changedKeys.includes('address') || changedKeys.includes('profile_code')) {
       this.log('Connection settings changed, reconnecting...');
+      // A series was started for the old address or profile: it ends (the cup
+      // on its way, if any, still counts), after all validation above.
+      if (this._series) this.stopBrewSeries(SETTINGS_TEXT);
       this._stopPolling();
       await this._resetClient('connection settings changed');
       // The backoff of the old address or profile means nothing for the new
@@ -2461,6 +2474,250 @@ class JuraMachineDevice extends Device {
       return await this._brewBy(productName, overrides, deadlineAt, othersRunning, deadlineMs);
     } finally {
       this._brewsRunning -= 1;
+    }
+  }
+
+  // ---------- brew series ("Brew a product several times") ----------
+
+  /**
+   * Brews a product `count` times, one cup after the other: cup 1 now, each
+   * next cup as soon as the machine is ready again (see _seriesTick). Resolves
+   * with true as soon as cup 1 is ACCEPTED by the machine (brew() unchanged:
+   * its guard, busy refusal and deadline all apply, so a refusal during a
+   * warm-up, a rinse or "please wait" throws here and starts nothing). A
+   * failure of cup 1 clears the series and rethrows: the card shows it and no
+   * trigger fires. The later cups cannot fail the card, the trigger
+   * brew_series_ended tells how the series ended.
+   *
+   * One series per device: `_series` is set before the first await, so a second
+   * call in the same tick is refused too (ALREADY_TEXT, nothing sent).
+   * @param {string} productName as brew() takes it
+   * @param {object} overrides as brew() takes them
+   * @param {number} count 1 to MAX_CUPS (checked again here, app.js checks first)
+   * @returns {Promise<true>}
+   */
+  async startBrewSeries(productName, overrides, count) {
+    const requested = cupCount(count);
+    if (requested === null) throw new Error(COUNT_TEXT);
+    const label = safeText(String(productName).trim());
+    if (this._series) {
+      this.log(`Brew series not started (${label}): another series is running.`);
+      throw new Error(ALREADY_TEXT);
+    }
+    const series = { productName, label, overrides, requested, started: 0, acceptedAt: 0, cupSeen: false, lastObstacle: '', readyTicks: 0, sending: true, cancelled: null };
+    this._series = series;
+    this.log(`Brew series (${label}, ${requested} cups): cup 1.`);
+    try {
+      await this.brew(productName, overrides);
+    } catch (err) {
+      series.sending = false;
+      if (this._series === series) this._series = null;
+      throw err;
+    }
+    series.sending = false;
+    // Ended meanwhile (uninit, delete, a settings change): the cup was accepted,
+    // so the card resolves, but nothing is armed and nothing fires.
+    if (this._series !== series) return true;
+    this._seriesAccepted(series);
+    if (series.started === requested) this._endBrewSeries(series, { reason: completedText(requested), notify: false });
+    else if (series.cancelled !== null) this._endBrewSeries(series, { reason: series.cancelled, notify: false });
+    else this._armSeriesTick(series);
+    return true;
+  }
+
+  /**
+   * Stops the running series. No series: nothing to do, false. While a brew()
+   * of the series is on its way, the stop is only noted: that cup counts when
+   * the machine accepts it and no further cup follows. Otherwise the series
+   * ends at once with `reason`.
+   * @param {string} [reason]
+   * @returns {boolean} whether there was a series
+   */
+  stopBrewSeries(reason = STOPPED_TEXT) {
+    const series = this._series;
+    if (!series) {
+      this.log('No brew series to stop.');
+      return false;
+    }
+    if (series.sending) {
+      if (series.cancelled === null) series.cancelled = reason;
+      this.log(`Brew series (${series.label}): stop asked, the cup on its way still counts.`);
+      return true;
+    }
+    this._endBrewSeries(series, { reason, notify: false });
+    return true;
+  }
+
+  /**
+   * Notes that the machine accepted a cup of the series: counts it, starts the
+   * wait for the next one (the clock of SERIES_CUP_WAIT_MS) and checks whether
+   * the cup is already visible.
+   * @param {object} series
+   */
+  _seriesAccepted(series) {
+    series.started += 1;
+    series.acceptedAt = this._monotonicNow();
+    // Every cup needs its own evidence: an old true must not carry over.
+    series.cupSeen = false;
+    // Every cup is its own evidence: no obstacle and no ready tick of the wait
+    // after the previous cup may carry over.
+    series.lastObstacle = '';
+    series.readyTicks = 0;
+    series.cupSeen = this._seriesCupSeen(series);
+  }
+
+  /**
+   * Whether there is evidence of the cup the series sent last: the client is in
+   * its brew phase, or a progress frame (@TB, @TV:) came at or after the accept.
+   * An accept alone is not enough: a machine that is brewing answers a second
+   * command with @tp and ignores it. Callers keep a true answer.
+   * @param {object} series
+   * @returns {boolean}
+   */
+  _seriesCupSeen(series) {
+    if (series.cupSeen) return true;
+    if (this._client !== null && this._client.inBrewPhase()) return true;
+    return this._lastProgressAt !== null && this._lastProgressAt >= series.acceptedAt;
+  }
+
+  /**
+   * Arms the one timer that looks at the series after SERIES_TICK_MS. A timer
+   * that is still pending is cleared first, so there is at most one.
+   * @param {object} series
+   */
+  _armSeriesTick(series) {
+    if (this._seriesTimer !== null) this.homey.clearTimeout(this._seriesTimer);
+    this._seriesTimer = this.homey.setTimeout(() => {
+      this._seriesTimer = null;
+      this._seriesTick(series);
+    }, SERIES_TICK_MS);
+  }
+
+  /**
+   * One look at a series that waits for its next cup: has the cup been seen,
+   * must the series stop (attention, switching off), has the wait run out, or is
+   * the machine ready again so that the next cup goes. The next cup goes only
+   * when the cup was seen, the machine is ready, no other brew of this device
+   * is in flight (_brewsRunning is 0) and that held on two consecutive ticks
+   * (readyTicks). The last obstacle shown in the timeout text is the most
+   * specific one of the current cup (reset per cup). Otherwise it arms the
+   * timer again. The whole body is guarded: a throw ends the series (an
+   * unhandled throw in a timer would leave it hanging and refuse every new one).
+   * @param {object} series
+   */
+  _seriesTick(series) {
+    if (this._series !== series) return;
+    try {
+      const now = this._monotonicNow();
+      series.cupSeen = this._seriesCupSeen(series);
+      const input = this._readinessInput();
+      if (series.cupSeen) {
+        // What the machine is really waiting for: the first obstacle that is
+        // neither "the device does not know" nor the brew itself.
+        // "no coffee_ready" is listed first by assessReadiness, so a more
+        // specific obstacle (busy, alarm) wins when there is one.
+        const shown = assessReadiness(input).obstacles.filter(
+          (o) => !READY_UNKNOWN_OBSTACLES.has(o) && o !== 'brew phase' && !o.startsWith('invalid input')
+        );
+        const found = shown.find((o) => o !== `no ${READY_ALERT}`) || shown[0];
+        if (found) series.lastObstacle = found;
+      }
+      // Ready means: the cup was seen, the machine is ready and no other brew
+      // command of this device is in flight. The next cup goes on the second
+      // consecutive ready tick, so a late @TB of another brew (a tap, a second
+      // flow) cannot be run into.
+      const readyNow = series.cupSeen && this.isReadyToBrew() && this._brewsRunning === 0;
+      const readyBefore = series.readyTicks >= 1;
+      series.readyTicks = readyNow ? series.readyTicks + 1 : 0;
+      const fresh = input.statusIsFresh && !input.inBrewPhase && input.status !== null;
+      const stop = seriesStop({
+        fresh,
+        status: input.status,
+        switchedOff: this._switchedOff,
+        switchOffWindowOpen: this._switchOffWindowOpen(now),
+      });
+      if (stop) {
+        this._endBrewSeries(series, { reason: stopText(stop), notify: true });
+      } else if (now - series.acceptedAt >= SERIES_CUP_WAIT_MS) {
+        const obstacle = safeText(series.lastObstacle || 'unknown', LOG_TEXT_MAX);
+        const reason = series.cupSeen ? notReadyText(series.started, obstacle) : notSeenText(series.started);
+        this._endBrewSeries(series, { reason, notify: true });
+      } else if (readyNow && readyBefore) {
+        this._seriesSendNext(series).catch((err) => {
+          this.error('Brew series step failed:', safeText(err && err.message, LOG_TEXT_MAX));
+          this._endBrewSeries(series, { reason: INTERNAL_TEXT, notify: false });
+        });
+      } else {
+        this._armSeriesTick(series);
+      }
+    } catch (err) {
+      this.error('Brew series check failed:', safeText(err && err.message, LOG_TEXT_MAX));
+      this._endBrewSeries(series, { reason: INTERNAL_TEXT, notify: false });
+    }
+  }
+
+  /**
+   * Sends the next cup of the series through the unchanged brew(). Never
+   * retries: any failure ends the series with the text brew() threw, which is
+   * our own user text. A stop that came while the cup was on its way (see
+   * stopBrewSeries) lets this cup count and ends the series after it.
+   * @param {object} series
+   */
+  async _seriesSendNext(series) {
+    series.sending = true;
+    this.log(`Brew series (${series.label}): cup ${series.started + 1} of ${series.requested}, the machine is ready again.`);
+    try {
+      await this.brew(series.productName, series.overrides);
+    } catch (err) {
+      series.sending = false;
+      const stopped = series.cancelled !== null;
+      const reason = series.cancelled ?? ((err && err.message) || INTERNAL_TEXT);
+      this._endBrewSeries(series, { reason: safeText(reason, UNAVAILABLE_TEXT_MAX), notify: !stopped });
+      return;
+    }
+    series.sending = false;
+    if (this._series !== series) return;
+    this._seriesAccepted(series);
+    if (series.started === series.requested) this._endBrewSeries(series, { reason: completedText(series.requested), notify: false });
+    else if (series.cancelled !== null) this._endBrewSeries(series, { reason: series.cancelled, notify: false });
+    else this._armSeriesTick(series);
+  }
+
+  /**
+   * Ends a series, at most once: it returns at once when `series` is no longer
+   * the current one. The timer is cleared and `_series` is null BEFORE the
+   * trigger fires, so whatever the trigger starts finds no series running.
+   * The trigger brew_series_ended is fetched here, lazily, never in onInit.
+   * @param {object} series
+   * @param {object} outcome
+   * @param {string} outcome.reason what ends up in the log and the `reason` token
+   * @param {boolean} [outcome.notify] the stop came from the machine or the link
+   *   (attention, switching off, a timeout, a failed brew command): for the
+   *   timeline message of a later step, not used yet
+   * @param {boolean} [outcome.silent] the app stops or the device goes: log only,
+   *   no trigger
+   */
+  _endBrewSeries(series, { reason, silent = false }) {
+    if (!series || this._series !== series) return;
+    if (this._seriesTimer !== null) this.homey.clearTimeout(this._seriesTimer);
+    this._seriesTimer = null;
+    this._series = null;
+    const text = safeText(reason, UNAVAILABLE_TEXT_MAX);
+    const completed = series.started === series.requested;
+    this.log(
+      completed
+        ? `Brew series done (${series.label}): ${series.started} of ${series.requested} cups started.`
+        : `Brew series stopped (${series.label}): ${series.started} of ${series.requested} cups started. ${text}`
+    );
+    if (silent) return;
+    const failed = (err) => this.error('Brew series trigger failed:', safeText(err && err.message, LOG_TEXT_MAX));
+    try {
+      this.homey.flow
+        .getDeviceTriggerCard('brew_series_ended')
+        .trigger(this, { cups: series.started, requested: series.requested, completed, reason: text })
+        .catch(failed);
+    } catch (err) {
+      failed(err);
     }
   }
 

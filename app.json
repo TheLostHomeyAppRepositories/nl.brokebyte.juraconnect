@@ -1035,8 +1035,8 @@
           "nl": "Zet een product"
         },
         "titleFormatted": {
-          "en": "Brew [[product]] at strength [[strength]]",
-          "nl": "Zet [[product]] op sterkte [[strength]]"
+          "en": "Brew [[product]] at strength [[strength]], [[ml]] ml",
+          "nl": "Zet [[product]] op sterkte [[strength]], [[ml]] ml"
         },
         "args": [
           {
@@ -1059,6 +1059,22 @@
             "placeholder": {
               "en": "Strength (default)",
               "nl": "Sterkte (standaard)"
+            }
+          },
+          {
+            "name": "ml",
+            "type": "number",
+            "required": false,
+            "min": 0,
+            "max": 450,
+            "step": 5,
+            "title": {
+              "en": "Amount (ml)",
+              "nl": "Hoeveelheid (ml)"
+            },
+            "placeholder": {
+              "en": "default",
+              "nl": "standaard"
             }
           }
         ]

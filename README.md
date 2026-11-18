@@ -101,11 +101,11 @@ While it connects, two things can come up:
 | `brew_espresso_double_button` / `brew_coffee_double_button` | "Brew 2x espresso" and "Brew 2x coffee", only added on machines whose data has an active 2-cup espresso and 2-cup coffee (44 of the bundled models; not yet the E4, see the E4 note). They brew the machine's own 2-cup product at its default amount; the Coffee and Espresso amount and strength settings do not apply. Paired devices get them at the first start of 0.15.0. They are only removed when the machine model in the settings changes |
 
 Flow cards: a "Brew a product" action covering any product your
-specific machine has, with an optional strength argument; a trigger
-and a condition for each alarm above; and a "crossed above X%" trigger
-plus an "is above X%" condition for each maintenance type. "Total
-brews" and the maintenance percentages are available in the device
-settings, under Statistics.
+specific machine has, with an optional strength and an optional amount
+in ml; a trigger and a condition for each alarm above; and a "crossed
+above X%" trigger plus an "is above X%" condition for each maintenance
+type. "Total brews" and the maintenance percentages are available in
+the device settings, under Statistics.
 
 Since 0.14.0 there are also:
 
@@ -142,8 +142,9 @@ Since 0.14.0 there are also:
 
 Since 0.15.0 there are also:
 
-- "Brew a product several times" (action): a product, 1 to 5 cups and
-  an optional strength. The card is done once the machine accepts the
+- "Brew a product several times" (action): a product, 1 to 5 cups,
+  an optional strength and an optional amount in ml (the same for every
+  cup). The card is done once the machine accepts the
   first cup. The app brews each next cup once the previous cup was seen
   and the machine is ready to brew again (the same rule as the ready
   trigger, on two checks in a row). There is no pause in between, so the
@@ -216,6 +217,13 @@ and per machine (an E8 takes 25 to 240 ml for coffee and 15 to 80 ml
 for espresso, in steps of 5). An amount outside that is rejected when
 you save, with a message such as "Espresso (ml) must be between 15
 and 80 ml, in steps of 5, for this machine."
+
+The two brew cards also have an optional amount in ml. Filled in, it
+replaces the setting for that card, with the same limits, and nothing
+is sent when it does not fit. Left empty, nothing changes. Drinks
+without an adjustable amount, such as milk foam, ignore it. Drinks that
+add extra water by default, such as Cafe Barista and Barista Lungo, do
+not take an amount in a flow yet.
 
 Strength for coffee and espresso is the level number your machine
 itself shows, on whatever scale that machine uses: a numeric scale

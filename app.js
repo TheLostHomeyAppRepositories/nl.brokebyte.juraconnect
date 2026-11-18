@@ -41,6 +41,8 @@ class JuraConnectApp extends App {
           overrides.coffee_strength = args.strength.id;
         }
       }
+      const amount = waterAmount(getDeviceProfile(args.device), args.product.id, args.ml);
+      if (amount !== null) overrides.water_amount = amount;
       await args.device.brew(args.product.id, overrides);
       return true;
     });

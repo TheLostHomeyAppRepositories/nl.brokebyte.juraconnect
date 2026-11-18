@@ -5,6 +5,7 @@ const models = require('./lib/models');
 const profileLib = require('./lib/profile');
 const brewChoices = require('./lib/brewChoices');
 const { cupCount, COUNT_TEXT } = require('./lib/brewSeries');
+const { waterAmount } = require('./lib/brewAmount');
 
 class JuraConnectApp extends App {
 
@@ -186,6 +187,8 @@ class JuraConnectApp extends App {
           overrides.coffee_strength = args.strength.id;
         }
       }
+      const amount = waterAmount(getDeviceProfile(args.device), args.product.id, args.ml);
+      if (amount !== null) overrides.water_amount = amount;
       await args.device.startBrewSeries(args.product.id, overrides, count);
       return true;
     });

@@ -1070,8 +1070,8 @@
           "nl": "Zet een product meerdere keren"
         },
         "titleFormatted": {
-          "en": "Brew [[product]] [[count]] times at strength [[strength]]",
-          "nl": "Zet [[count]] keer [[product]] op sterkte [[strength]]"
+          "en": "Brew [[product]] [[count]] times at strength [[strength]], [[ml]] ml",
+          "nl": "Zet [[count]] keer [[product]] op sterkte [[strength]], [[ml]] ml"
         },
         "hint": {
           "en": "Brews the first cup right away; the card is done as soon as the machine accepts it. The app then brews each next cup as soon as the machine is ready again, with no pause in between. The series stops early when the machine needs attention, is switching off, or is not ready again within 4 minutes after it accepted a cup, when a brew command fails, and when the app or Homey restarts. Use the card A brew series ended to act on the outcome. Do not start this card from the Machine became ready to brew trigger. Every cup goes into whatever is under the spout.",
@@ -1106,6 +1106,22 @@
             "placeholder": {
               "en": "Strength (default)",
               "nl": "Sterkte (standaard)"
+            }
+          },
+          {
+            "name": "ml",
+            "type": "number",
+            "required": false,
+            "min": 0,
+            "max": 450,
+            "step": 5,
+            "title": {
+              "en": "Amount (ml)",
+              "nl": "Hoeveelheid (ml)"
+            },
+            "placeholder": {
+              "en": "default",
+              "nl": "standaard"
             }
           }
         ]

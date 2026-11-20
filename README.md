@@ -161,7 +161,7 @@ Since 0.15.0 there are also:
   app or Homey restarts), with the
   tokens Cups accepted, Cups asked, All cups accepted and Reason. An
   accepted cup is a command the machine took, not proof that a cup came
-  out. When the machine stops a series (attention, switching off, a
+  out. When the machine stops a series (attention, switched off, a
   timeout, a failed brew command) there is also one timeline message.
 - Do not start a series from "Machine became ready to brew" or from
   "A brew series ended": that loops.

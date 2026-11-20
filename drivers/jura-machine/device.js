@@ -2650,8 +2650,8 @@ class JuraMachineDevice extends Device {
 
   /**
    * One look at a series that waits for its next cup: has the cup been seen,
-   * must the series stop (attention, switching off), has the wait run out, or is
-   * the machine ready again so that the next cup goes. The next cup goes only
+   * must the series stop (attention, the machine switched off), has the wait
+   * run out, or is the machine ready again so that the next cup goes. The next cup goes only
    * when the cup was seen, the machine is ready, no other brew of this device
    * is in flight (_brewsRunning is 0) and that held on two consecutive ticks
    * (readyTicks). A tick that sees another brew in flight also holds the series
@@ -2693,16 +2693,19 @@ class JuraMachineDevice extends Device {
       const readyBefore = series.readyTicks >= 1;
       series.readyTicks = readyNow ? series.readyTicks + 1 : 0;
       const fresh = input.statusIsFresh && !input.inBrewPhase && input.status !== null;
-      // Every failed poll resets its client and so does onClose, and a switched-off
-      // machine has no TCP session. A connected client while the flag is set is
-      // therefore a session made after the switch-off (the machine is on again),
-      // or one made inside the switch-off window, which stops the series anyway.
-      // The switch-off window and a fresh switch_off_delay_active still stop.
+      // The announcement (the alert or the switch-off window) does not stop the
+      // series: some machines announce and do not switch off (seen on an E4).
+      // The hold is the ready state: isReadyToBrew() is false while the alert
+      // shows and needs a fresh coffee_ready, and the brew guard agrees when
+      // brew_alarm_guard is on. Every failed poll resets its client and so does
+      // onClose, and a switched-off machine has no TCP session. A connected client
+      // while the flag is set is therefore a session made after the switch-off
+      // (the machine is on again). Only a real switch-off stops the series: the
+      // device lost the machine after the announcement and no client is connected.
       const stop = seriesStop({
         fresh,
         status: input.status,
         switchedOff: this._switchedOff && !input.connected,
-        switchOffWindowOpen: this._switchOffWindowOpen(now),
       });
       if (stop) {
         this._endBrewSeries(series, { reason: stopText(stop), notify: true });
@@ -2760,7 +2763,7 @@ class JuraMachineDevice extends Device {
    * @param {object} outcome
    * @param {string} outcome.reason what ends up in the log and the `reason` token
    * @param {boolean} [outcome.notify] the stop came from the machine or the link
-   *   (attention, switching off, a timeout, a failed brew command): one
+   *   (attention, switched off, a timeout, a failed brew command): one
    *   timeline message on top of the trigger (see _seriesNotify)
    * @param {boolean} [outcome.silent] the app stops or the device goes: log only,
    *   no trigger

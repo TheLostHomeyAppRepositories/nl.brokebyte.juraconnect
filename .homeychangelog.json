@@ -117,5 +117,9 @@
   "0.15.0": {
     "en": "New: the action \"Brew a product several times\". The app brews the cups one after another and waits until the machine is ready again before each next cup. It stops when the machine asks for something or switches off, and the new trigger \"A brew series ended\" tells you how it went. There is also a card to stop a series. Machines that have them now get the buttons \"Brew 2x espresso\" and \"Brew 2x coffee\". \"Brew a product\" and \"Brew a product several times\" also get an optional amount in ml. Left empty, nothing changes.",
     "nl": "Nieuw: de actie \"Zet een product meerdere keren\". De app zet de koppen na elkaar en wacht voor elke volgende kop tot de machine weer klaar is. Hij stopt als de machine om iets vraagt of uitgaat, en de nieuwe trigger \"Een zetreeks is afgelopen\" vertelt hoe het ging. Er is ook een kaart om een reeks te stoppen. Machines die ze hebben krijgen nu de knoppen \"Zet 2x espresso\" en \"Zet 2x koffie\". \"Zet een product\" en \"Zet een product meerdere keren\" krijgen ook een optionele hoeveelheid in ml. Laat je die leeg, dan verandert er niets."
+  },
+  "0.15.1": {
+    "en": "Fix: \"Brew a product several times\" no longer stops after the first cup when the machine only announces that it is switching off. The series now waits until the machine is ready again, and stops only when the machine really switches off.",
+    "nl": "Opgelost: \"Zet een product meerdere keren\" stopt niet meer na de eerste kop als de machine alleen aankondigt dat hij uitgaat. De reeks wacht nu tot de machine weer klaar is en stopt alleen als de machine echt uitgaat."
   }
 }

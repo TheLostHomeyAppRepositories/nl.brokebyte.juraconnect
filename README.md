@@ -49,13 +49,11 @@ verification report. A report that it does not work helps just as much.
 
 On the E4 (EF1031), the "Brew a product" card also offers "2x Espresso"
 and "2x Coffee" from version 0.14.0. The machine data of that model
-marks them as inactive, so they were never offered before. They have
-not been confirmed on a real E4 yet; a report helps here too.
-"2x Espresso" has since been brewed on a real E4 through the "Brew a
-product" card (one brew with two cycles). "2x Coffee" is still not
-confirmed on a real E4. The 2x buttons (see Features) follow for the E4
-once both are confirmed. The 2x products of the E4 have no strength
-setting in Jura's data, so the machine uses its own default strength.
+marks them as inactive, so they were never offered before. Both have
+been brewed on a real E4 (one brew with two cycles), so the E4 also
+gets the 2x buttons (see Features) from version 0.15.2. The 2x products
+of the E4 have no strength setting in Jura's data, so the machine uses
+its own default strength.
 
 ## Pairing
 
@@ -98,7 +96,7 @@ While it connects, two things can come up:
 | `jura_maintenance_cleaning` / `_filter` / `_descale` | Percent until due, higher = sooner |
 | `brew_coffee_button` / `brew_espresso_button` | Quick-brew buttons on the device tile |
 | `brew_hotwater_button` | Same, only added on machines that actually have this product |
-| `brew_espresso_double_button` / `brew_coffee_double_button` | "Brew 2x espresso" and "Brew 2x coffee", only added on machines whose data has an active 2-cup espresso and 2-cup coffee (44 of the bundled models; not yet the E4, see the E4 note). They brew the machine's own 2-cup product at its default amount; the Coffee and Espresso amount and strength settings do not apply. Paired devices get them at the first start of 0.15.0. They are only removed when the machine model in the settings changes |
+| `brew_espresso_double_button` / `brew_coffee_double_button` | "Brew 2x espresso" and "Brew 2x coffee", only added on machines whose data has an active 2-cup espresso and 2-cup coffee (45 of the bundled models, the E4 from 0.15.2, see the E4 note). They brew the machine's own 2-cup product at its default amount; the Coffee and Espresso amount and strength settings do not apply. Paired devices get them at the first start of 0.15.0 (the E4: 0.15.2). They are only removed when the machine model in the settings changes |
 
 Flow cards: a "Brew a product" action covering any product your
 specific machine has, with an optional strength and an optional amount

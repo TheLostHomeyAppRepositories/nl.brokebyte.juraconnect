@@ -125,5 +125,9 @@
   "0.15.2": {
     "en": "The Jura E4 now also gets the buttons \"Brew 2x espresso\" and \"Brew 2x coffee\".",
     "nl": "De Jura E4 krijgt nu ook de knoppen \"Zet 2x espresso\" en \"Zet 2x koffie\"."
+  },
+  "0.15.3": {
+    "en": "\"Brew a product several times\" now goes up to 10 cups (was 5).",
+    "nl": "\"Zet een product meerdere keren\" gaat nu tot 10 koppen (was 5)."
   }
 }

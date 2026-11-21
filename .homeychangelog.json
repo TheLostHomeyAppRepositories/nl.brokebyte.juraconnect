@@ -121,5 +121,9 @@
   "0.15.1": {
     "en": "Fix: \"Brew a product several times\" no longer stops after the first cup when the machine only announces that it is switching off. The series now waits until the machine is ready again, and stops only when the machine really switches off.",
     "nl": "Opgelost: \"Zet een product meerdere keren\" stopt niet meer na de eerste kop als de machine alleen aankondigt dat hij uitgaat. De reeks wacht nu tot de machine weer klaar is en stopt alleen als de machine echt uitgaat."
+  },
+  "0.15.2": {
+    "en": "The Jura E4 now also gets the buttons \"Brew 2x espresso\" and \"Brew 2x coffee\".",
+    "nl": "De Jura E4 krijgt nu ook de knoppen \"Zet 2x espresso\" en \"Zet 2x koffie\"."
   }
 }

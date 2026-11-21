@@ -1090,8 +1090,8 @@
           "nl": "Zet [[count]] keer [[product]] op sterkte [[strength]], [[ml]] ml"
         },
         "hint": {
-          "en": "Brews the first cup right away; the card is done as soon as the machine accepts it. The app then brews each next cup as soon as the machine is ready again, with no pause in between. The series stops early when the machine needs attention, is switching off, or is not ready again within 4 minutes after it accepted a cup, when a brew command fails, and when the app or Homey restarts. Use the card A brew series ended to act on the outcome. Do not start this card from the Machine became ready to brew trigger. Every cup goes into whatever is under the spout.",
-          "nl": "Zet de eerste kop meteen; de kaart is klaar zodra de machine die aanneemt. Daarna zet de app elke volgende kop zodra de machine weer klaar is, zonder pauze ertussen. De reeks stopt eerder als de machine om iets vraagt, uitschakelt of niet binnen 4 minuten na het aannemen van een kop weer klaar is, als een zetopdracht mislukt, en als de app of Homey herstart. Gebruik de kaart Een zetreeks is afgelopen om op de uitkomst te reageren. Start deze kaart niet vanuit de trigger Machine werd klaar om te zetten. Elke kop komt in wat er onder de uitloop staat."
+          "en": "Brews the first cup right away; the card is done as soon as the machine accepts it. The app then brews each next cup as soon as the machine is ready again, with no pause in between. The series stops early when the machine needs attention, switches off, or is not ready again within 4 minutes after it accepted a cup, when a brew command fails, and when the app or Homey restarts. Use the trigger A brew series ended to act on the outcome. Do not start this card from the Machine became ready to brew trigger. Every cup goes into whatever is under the spout.",
+          "nl": "Zet de eerste kop meteen; de kaart is klaar zodra de machine die aanneemt. Daarna zet de app elke volgende kop zodra de machine weer klaar is, zonder pauze ertussen. De reeks stopt eerder als de machine om iets vraagt, uitschakelt of niet binnen 4 minuten na het aannemen van een kop weer klaar is, als een zetopdracht mislukt, en als de app of Homey herstart. Gebruik de trigger Een zetreeks is afgelopen om op de uitkomst te reageren. Start deze kaart niet vanuit de trigger Machine werd klaar om te zetten. Elke kop komt in wat er onder de uitloop staat."
         },
         "args": [
           {
@@ -1111,7 +1111,7 @@
             "name": "count",
             "type": "number",
             "min": 1,
-            "max": 5,
+            "max": 10,
             "step": 1,
             "placeholder": { "en": "3", "nl": "3" }
           },

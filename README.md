@@ -140,7 +140,7 @@ Since 0.14.0 there are also:
 
 Since 0.15.0 there are also:
 
-- "Brew a product several times" (action): a product, 1 to 5 cups,
+- "Brew a product several times" (action): a product, 1 to 10 cups,
   an optional strength and an optional amount in ml (the same for every
   cup). The card is done once the machine accepts the
   first cup. The app brews each next cup once the previous cup was seen

@@ -129,5 +129,9 @@
   "0.15.3": {
     "en": "\"Brew a product several times\" now goes up to 10 cups (was 5).",
     "nl": "\"Zet een product meerdere keren\" gaat nu tot 10 koppen (was 5)."
+  },
+  "0.15.4": {
+    "en": "The Jura C3 is now a confirmed model.",
+    "nl": "De Jura C3 is nu een bevestigd model."
   }
 }

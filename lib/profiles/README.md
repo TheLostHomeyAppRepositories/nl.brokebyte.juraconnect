@@ -10,15 +10,9 @@ folder, and their registration in `../models.js`.
 
 All 72 EF codes from `jura_connect`'s `JOE_MACHINES.TXT` are bundled
 here, one file per code. See `../models.js`'s `MODELS` array for the
-full list (label, EF code, every known article number). Two are
-live-verified against real hardware so far, both with the `verified:
-true` flag set in `models.js`:
-
-| EF code | Model | Verified via |
-|---|---|---|
-| `EF538` | Jura E8 | our own machine: pairing, status, brewing, maintenance %, alarms |
-| `EF1013` | ENA 4 (EA/EB/etc., same EF code across regional variants) | an external tester's [GitHub issue #1](https://github.com/WoutvanderAa/homey-jura-connect/issues/1): pairing, brewing, all five alarms at the time |
-
+full list (label, EF code, every known article number). The models
+confirmed on real hardware are listed in the main README.md under
+"Supported models", and `models.js` marks them with `verified: true`.
 Every other bundled profile is untested against real hardware and
 labelled accordingly in the pairing/settings UI.
 
